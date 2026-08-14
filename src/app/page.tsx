@@ -49,21 +49,20 @@ export default function Page() {
 
       <nav className={styles.nav}>
         <div className={styles.brand}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/tokens/strk20.png" alt="STRK20" className={styles.brandImg} />
+          <span aria-hidden style={{ fontWeight: 900 }}>VEYL</span>
         </div>
         <SelectWallet variant="nav" />
       </nav>
 
       <header className={styles.hero}>
         <h1 className={styles.heroTitle}>
-          Just Encrypt
+          Trade Without
           <br />
-          <span className={styles.heroAccent}>Everything</span>
+          <span className={styles.heroAccent}>Being Watched</span>
         </h1>
         <p className={styles.heroSub}>
-          Shield, unshield, privately transfer and build your own private apps
-          on Starknet.
+          Shield funds into the STRK20 pool, then trade and launch on Starknet
+          without linking your wallet to your positions.
         </p>
       </header>
 
@@ -72,11 +71,11 @@ export default function Page() {
       </main>
 
       <footer className={styles.footer}>
-        <a href="https://github.com/PhilippeR26/Starknet-WalletAccount" target="_blank" rel="noreferrer">
+        <a href="https://github.com/codeswithroh/veyl" target="_blank" rel="noreferrer">
           Repo
         </a>
         <span className={styles.footerDot}>·</span>
-        <span>Powered by Starknet.js v10.4.0</span>
+        <span>Built on Starknet.js v10.4.0 + STRK20</span>
       </footer>
     </div>
   );
