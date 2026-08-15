@@ -32,11 +32,15 @@ Legal pairings:
 
 ## Structure (Step 2.5)
 Macrostructure: Long-Scroll Narrative (poster-collage sections stacked, not card-grid) — matches the reference's scrapbook composition better than a feature-grid template.
-Beats (4, per user's "3-4 sections" instruction):
-1. Hook — hero: claim + mechanism in one line, halftone illustration of the note/escrow flow
-2. How it works — 3-step visual (Escrow → Round closes → Settle), annotated like a diagram, sticker-stamped
-3. Proof — two markets side by side (spot batch / liquidation auctions), stat stamps
-4. Close — built-on-STRK20 technical credibility block + CTA, bottom "cleared on starknet mainnet" credit stamp (riffs the reference's "designed by shrls" stamp)
+
+**Updated 2026-08-15 for the private-launch/trading-terminal pivot** (was: generic batch-clearing exchange copy). Palette/type/texture system unchanged — only the beats' content:
+1. Hook — hero: claim + mechanism in one line ("trade without being watched"), halftone illustration of the shield → shadow-wallet → trade flow
+2. How it works — 3-step visual (Shield → Unlinkable execution wallet → Trade/Launch), annotated like a diagram, sticker-stamped with real protocol facts
+3. Proof — two mechanics side by side (spot trading identity / sealed-bid fair launches), spec stamps — no invented volume/usage numbers, this is pre-launch
+4. Close — built-on-STRK20 technical credibility block + CTA, bottom "cleared on starknet mainnet" credit stamp
+
+## App shell (WalletAccountV6Tag panel — Step 4, skips Step 2.5)
+Existing tabbed component (Shield/Send/Unshield/Echo/Balances), logic untouched, restyled only. Dark olive surface cards, tab-switch transition + result-card entrance per the App shell motion track (no scroll-timeline — this isn't a scrolled screen).
 
 ## Assets
 - Icons: Iconify, technical mood set, tinted to accent — fetched below

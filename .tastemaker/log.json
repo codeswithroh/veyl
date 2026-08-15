@@ -1,0 +1,21 @@
+[
+  {
+    "date": "2026-08-15",
+    "project": "veyl",
+    "screens": ["landing (marketing narrative)", "app shell (wallet action panel)"],
+    "macrostructure": "long-scroll-narrative",
+    "beats": ["hook", "how-it-works", "proof", "app-embed", "close"],
+    "archetypes": {
+      "nav": "sticky wordmark stamp + link row",
+      "hero": "split hero, halftone process-diagram visual, sticker-labeled",
+      "feature": "annotated 3-step cards, sticker-stamped",
+      "proof": "2-up spec comparison, no invented metrics",
+      "footer": "credit-stamp pill + link row"
+    },
+    "palette_seed": "veyl-riso-01 (locked, not regenerated)",
+    "mood": "technical+elegant (riso/print, olive+dusty-rose)",
+    "contrast": "text-safe, verified via check_contrast.py (main palette + derived muted/success/danger tokens)",
+    "critique_scores": { "show_dont_tell": 4, "philosophy": 4, "hierarchy": 4, "specificity": 4, "restraint": 4, "variety": 4 },
+    "notes": "Second build in this project (first was a standalone artifact preview, not logged). Reused locked style-lock verbatim for color/type; only beat content changed for the terminal pivot. App shell screen (wallet panel) skipped Step 2.5 per the skill's own rule."
+  }
+]

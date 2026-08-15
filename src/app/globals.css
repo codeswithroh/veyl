@@ -91,17 +91,51 @@ body {
   overflow-x: hidden;
 }
 
-/* Redesigned app is committed to a single light "aurora" theme. */
+/* Veyl is committed to a single dark theme (olive/riso print aesthetic —
+   .tastemaker/style-lock.md). No light variant: the identity IS the dark ground.
+   Palette lives on :root (not scoped to one CSS module) so components like
+   SelectWallet, used both inside and outside uni.module.css's `.page`, resolve
+   the same tokens everywhere. */
+:root {
+  --ink: #F2E9D8;
+  --muted: #C9BFA0;
+  --bg: #33421F;
+  --card: #2A3519;
+  --line: #5C6B3E;
+  --inset: #2E3A1F;
+  --inset-2: #3A4A28;
+  --pink: #C97B5F;
+  --pink-soft: #34291F;
+  --pink-soft-2: #4A3A2C;
+  --pink-text: #D9A79B;
+  --green: #8FAF6B;
+  --green-soft: #263420;
+  --danger: #C97C6B;
+  --on-fill: #1C1C1C;
+}
+
 html {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 body {
-  color: #0b0a14;
-  background: #fbf7fd;
+  color: #F2E9D8;
+  background: #33421F;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Film grain — shared across every screen, per style-lock's texture system. */
+.veyl-grain {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 40;
+  opacity: 0.14;
+  mix-blend-mode: overlay;
 }
