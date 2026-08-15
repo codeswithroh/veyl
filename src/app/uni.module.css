@@ -1,26 +1,10 @@
-/* tastemaker-stamp: screen=app-shell | mood=technical+elegant(riso/print, olive+dusty-rose) | palette=locked (.tastemaker/style-lock.md) | contrast=text-safe (verified) | motion=app-shell track (tab switch + card entrance, no scroll timeline) */
-/* Veyl action panel — dark olive/riso theme, tokens from .tastemaker/style-lock.md.
-   Structure/markup unchanged from the starter kit; only color values + a light
-   entrance-motion pass changed here. Old var NAMES kept where practical so the
-   diff against the starter's light theme stays legible. */
+/* tastemaker-stamp: screen=app-shell | mood=premium-fintech(ember/vortex) | palette=locked (.tastemaker/style-lock.md) | contrast=text-safe (verified) | motion=app-shell track (tab switch + card entrance, no scroll timeline) */
+/* Veyl action panel — restyled 2026-08-16 for the ember/vortex direction.
+   Colors now come from :root (globals.css), which aliases this module's old
+   riso-era variable names onto the new ember tokens — no local overrides here,
+   so this panel and the rest of the app always share one palette. */
 
 .page {
-  --ink: #F2E9D8;          /* was --ink: light-theme black -> now `text` */
-  --muted: #C9BFA0;        /* derived, checked 5.9:1 on bg / 7.06:1 on surface */
-  --bg: #33421F;           /* `bg` */
-  --card: #2A3519;         /* `surface` */
-  --line: #5C6B3E;         /* `border` (decorative-tier hairlines, matches contract) */
-  --inset: #2E3A1F;        /* input-block bg, near-surface */
-  --inset-2: #3A4A28;      /* hover nudge, one step lighter */
-  --pink: #C97B5F;         /* `accent` (terracotta) — CTA / pending fill */
-  --pink-soft: #34291F;    /* dark rose-tinted surface, for pending/active tab bg */
-  --pink-soft-2: #4A3A2C;  /* hover step on pink-soft */
-  --pink-text: #D9A79B;    /* `primary` (dusty rose) — used as text/link color */
-  --green: #8FAF6B;        /* success fill, checked 6.91:1 on-primary */
-  --green-soft: #263420;   /* dark sage-tinted surface */
-  --danger: #C97C6B;       /* danger fill, checked 5.34:1 on-primary */
-  --on-fill: #1C1C1C;      /* `on-primary` — glyph color on accent/success/danger fills */
-
   position: relative;
   min-height: 100dvh;
   background: var(--bg);
@@ -28,80 +12,6 @@
   font-family: var(--font-body), system-ui, sans-serif;
   overflow-x: hidden;
   isolation: isolate;
-}
-
-/* --- Scattered token-orb background ------------------------------------- */
-.aurora {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-.tok {
-  position: absolute;
-  display: inline-flex;
-  will-change: transform;
-}
-.tok svg { display: block; }
-
-/* --- Top nav ------------------------------------------------------------- */
-.nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: 18px 24px;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-family: var(--font-display), sans-serif;
-  font-weight: 900;
-  font-size: 19px;
-  letter-spacing: 0.02em;
-  color: var(--pink-text);
-  transform: rotate(-1.5deg);
-}
-.brandImg {
-  height: 26px;
-  width: auto;
-  display: block;
-}
-
-/* --- Hero ---------------------------------------------------------------- */
-.hero {
-  text-align: center;
-  margin: 46px auto 30px;
-  padding: 0 20px;
-}
-.heroTitle {
-  font-family: var(--font-display), sans-serif;
-  font-weight: 900;
-  text-transform: uppercase;
-  font-size: clamp(40px, 7vw, 76px);
-  line-height: 0.98;
-  letter-spacing: -0.01em;
-  margin: 0;
-  color: var(--pink-text);
-  text-wrap: balance;
-}
-.heroAccent {
-  font-family: var(--font-script), serif;
-  font-style: italic;
-  font-weight: 400;
-  text-transform: none;
-  color: var(--ink);
-  display: inline-block;
-}
-.heroSub {
-  margin: 18px auto 0;
-  max-width: 440px;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.5;
 }
 
 /* --- Network status dots ------------------------------------------------ */
@@ -135,13 +45,13 @@
 .receipt {
   margin-top: 12px;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: 20px;
   background: var(--card);
   border: 1px solid var(--line);
   animation: receiptIn 220ms ease-out;
 }
 .receiptOk { border-color: var(--green); background: var(--green-soft); }
-.receiptError { border-color: var(--danger); background: #3A2620; }
+.receiptError { border-color: var(--danger); background: #241512; }
 .receiptPending { border-color: var(--pink); background: var(--pink-soft); }
 .receiptHead {
   display: flex;
@@ -215,13 +125,13 @@
 .verdict {
   margin-top: 10px;
   padding: 14px;
-  border-radius: 10px;
+  border-radius: 20px;
   border: 1px solid var(--line);
   background: var(--inset);
   animation: receiptIn 220ms ease-out;
 }
 .verdictPass { border-color: var(--green); background: var(--green-soft); }
-.verdictFail { border-color: var(--danger); background: #3A2620; }
+.verdictFail { border-color: var(--danger); background: #241512; }
 .verdictHead {
   display: flex;
   align-items: center;
@@ -310,7 +220,7 @@
   width: min(400px, calc(100vw - 32px));
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 22px;
   box-shadow: 0 20px 60px -18px rgba(0, 0, 0, 0.5);
   padding: 18px;
   animation: receiptIn 220ms ease-out;
@@ -348,7 +258,7 @@
   width: 100%;
   padding: 13px 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 20px;
   background: var(--inset);
   cursor: pointer;
   text-align: left;
@@ -370,30 +280,15 @@
 .walletHint a { color: var(--pink-text); font-weight: 600; text-decoration: none; }
 .walletHint a:hover { text-decoration: underline; }
 
-/* Footer */
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 44px auto 34px;
-  color: var(--muted);
-  font-size: 13px;
-}
-.footer a { color: var(--pink-text); text-decoration: none; font-weight: 500; }
-.footer a:hover { text-decoration: underline; }
-.footerDot { color: var(--line); }
-
 /* --- Tabbed action interface --------------------------------------------- */
 .panel {
   width: min(520px, calc(100vw - 32px));
   margin: 0 auto;
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 22px;
   padding: 20px;
-  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 0 24px 60px -24px rgba(255, 90, 46, 0.25), 0 20px 50px -20px rgba(0, 0, 0, 0.6);
 }
 
 .tabs {
@@ -427,7 +322,7 @@
 .inputBlock {
   background: var(--inset);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 20px;
   padding: 18px 18px 16px;
   animation: receiptIn 180ms ease-out;
 }
@@ -476,7 +371,7 @@
   margin-top: 8px;
   padding: 15px 16px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 20px;
   font-size: 14px;
   color: var(--muted);
   background: var(--card);

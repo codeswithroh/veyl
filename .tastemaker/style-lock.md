@@ -1,51 +1,50 @@
 # Veyl — Style Lock
 
-## Direction
-Riso-print / zine-poster nostalgia, adapted for a serious mainnet trading product. Source: user-pasted poster reference (dark olive ground, dusty-rose display type, halftone illustration, film grain, condensed grotesque + brush-script pairing, rotated sticker labels, pill-outline annotations, doodle arrow, bottom credit stamp). Grammar kept; content swapped from "personal creative zine" to "clearing-engine mechanics" — stickers become ticket/status stamps (SEALED, CLEARED, LIVE), annotation bubbles carry real protocol facts instead of jokes.
+## Direction (superseded 2026-08-16 — full pivot, user-directed)
+**Previous direction (riso/print olive) is retired.** User supplied a real reference set (Cryptox-style crypto trading template screenshots) and real asset files — `design/assets/hero_bg.mp4` (orange/black vortex loop), `design/assets/trading.png` (glass dashboard 3-card mockup), `design/assets/chart.webp`, `design/assets/risk_management.svg` — and asked for the whole landing page rebuilt to match, using those exact assets. This is now the locked direction. Palette below is extracted from the real asset files (`scripts/extract_palette.py`), not eyeballed from the screenshots.
 
-Mood: technical + elegant hybrid (not a stock mood — mixed deliberately: olive/grain/print texture reads *serious/analog/trustworthy*, the brush-script accent reads *considered, not corporate*).
+Mood: premium fintech / "ember vortex" — near-black ground, warm dark-grey glass cards, a single vivid orange-red accent used sparingly for CTAs, live indicators, and glow. Video hero background (looping, muted, watermark removed via ffmpeg delogo).
 
 ## Color contract (checked via check_contrast.py --matrix)
-- bg `#33421F` (deep olive ground)
-- surface `#2A3519` (card/panel, darker olive)
-- text `#F2E9D8` (warm cream)
-- primary `#D9A79B` (dusty rose — headline type, primary actions)
-- accent `#C97B5F` (burnt terracotta — stickers, live indicators)
-- border `#5C6B3E` (muted olive line)
-- on-primary `#1C1C1C` (near-black, for text on rose/terracotta fills)
+- bg `#0A0A0A` (near-black ground)
+- surface `#1C1B1A` (glass card surface)
+- surface-2 `#262524` (nested/hover card variant — not in the strict matrix, kept close in lightness to surface so text contrast carries over)
+- text `#F5F1ED` (warm off-white)
+- muted `#A69C93` (secondary text — checked separately: 7.35:1 on bg, 6.39:1 on surface)
+- primary `#FF5A2E` (vivid ember orange — CTAs, live/active state, glow accents)
+- accent `#B23A17` (deeper ember — gradient partner to primary, decorative glows)
+- border `#33302E` (hairline on dark surfaces)
+- on-primary `#0A0A0A` (near-black — text ON primary-fill buttons; the reference template uses white-on-orange but that pairing fails contrast (2.77:1) — using near-black text on the orange fill instead, which passes at 6.37:1 and still reads as bold/punchy)
 
 Legal pairings:
-- Text-safe (>=4.5): text/on-primary, text/surface, text/bg, primary/on-primary, surface/primary, accent/on-primary, bg/primary, text/border
-- UI-safe (>=3.0): surface/accent, bg/accent
-- Decorative only (<3.0, hairlines/large-scale only): border/on-primary, primary/border, text/accent, surface/border, bg/border, accent/border, text/primary, bg/on-primary, primary/accent, surface/on-primary, bg/surface
+- Text-safe (>=4.5): text/bg, text/surface, text/border, text/on-primary, bg/primary, primary/on-primary, surface/primary, text/accent
+- UI-safe (>=3.0): primary/border, bg/accent, accent/on-primary
+- Decorative only (<3.0): surface/accent, text/primary (do not put text-colored text on a raw primary fill — use on-primary instead), accent/border, primary/accent, bg/border, border/on-primary, surface/border, bg/surface, surface/on-primary, bg/on-primary
 
 ## Type pairing
-- Display/condensed grotesque: "Anton" (Google Fonts) — headline blocks, sticker labels, stat numbers
-- Script/brush accent: "Instrument Serif" italic (Google Fonts) — single emphasis words inside headlines only, never body copy
-- Body/UI: "Inter" — all running copy, nav, buttons, data
+- Display: bold rounded/geometric sans (reference uses a rounded grotesque) — using next/font/google "Plus Jakarta Sans" at weight 700-800 for headlines, close match to the reference's rounded bold display type
+- Body/UI: "Inter" (already loaded) — running copy, nav, buttons, data
+- Mono: existing "Space Mono" (--font-mono-ui) — unchanged, still used for addresses/hashes
 
-## Texture system
-- Film grain: SVG feTurbulence overlay, fixed, low opacity, screen-blend
-- Halftone: CSS radial-gradient dot-matrix pattern (code-native — no photography needed, this is a graphic/print style not a photo style)
-- Sticker labels: rotated -3deg to 4deg, solid accent/primary fill, on-primary text, hard drop shadow (no blur) to read as cut paper
-- Annotation bubbles: 2px border, bg color, pill radius, hand-drawn feel via slight border-radius asymmetry
+Note: the old Anton + Instrument Serif pairing (riso direction) is dropped for the primary brand voice but the font loads can stay in the codebase unused, or be removed in a later cleanup pass — not blocking.
+
+## Texture / asset system
+- Hero background: `design/assets/hero_bg_clean.mp4` — looping, muted, autoplay, playsInline, watermark removed via ffmpeg `delogo` filter (box x=1130 y=565 w=90 h=75 at 1280x720 source), poster = `hero_bg_poster.jpg`
+- Dashboard mockup: `design/assets/trading.png` (3-card glass panel) — used in hero as the "proof" visual, floating below/beside the headline per the reference layout
+- Feature/mechanism illustration: `design/assets/risk_management.svg` — recolor-compatible (already orange-gradient), used in the "how it works" section
+- Chart fragment: `design/assets/chart.webp` — small supporting visual for a stat/balance-style card
+- Icons: existing Iconify carbon-set icons (locked, shuffle, rocket, timer, shield-alert, arrow-right) — kept, recolored to the new primary orange instead of the old terracotta (same hex family, no refetch needed)
+- Card glass effect: `surface` bg + 1px `border` + soft radial glow using `primary`/`accent` at low opacity, rounded corners (20-24px, matches reference)
 
 ## Structure (Step 2.5)
-Macrostructure: Long-Scroll Narrative (poster-collage sections stacked, not card-grid) — matches the reference's scrapbook composition better than a feature-grid template.
+Macrostructure: **Bento/Dashboard Showcase** hero (video bg + floating glass dashboard cards) → feature grid with connector illustration → "why choose" icon-card grid → app embed → close. Different shape from the prior long-scroll-narrative poster-collage (which is retired), matching the reference's product-showcase rhythm instead of a scroll-story.
 
-**Updated 2026-08-15 for the private-launch/trading-terminal pivot** (was: generic batch-clearing exchange copy). Palette/type/texture system unchanged — only the beats' content:
-1. Hook — hero: claim + mechanism in one line ("trade without being watched"), halftone illustration of the shield → shadow-wallet → trade flow
-2. How it works — 3-step visual (Shield → Unlinkable execution wallet → Trade/Launch), annotated like a diagram, sticker-stamped with real protocol facts
-3. Proof — two mechanics side by side (spot trading identity / sealed-bid fair launches), spec stamps — no invented volume/usage numbers, this is pre-launch
-4. Close — built-on-STRK20 technical credibility block + CTA, bottom "cleared on starknet mainnet" credit stamp
-
-## App shell (WalletAccountV6Tag panel — Step 4, skips Step 2.5)
-Existing tabbed component (Shield/Send/Unshield/Echo/Balances), logic untouched, restyled only. Dark olive surface cards, tab-switch transition + result-card entrance per the App shell motion track (no scroll-timeline — this isn't a scrolled screen).
-
-## Assets
-- Icons: Iconify, technical mood set, tinted to accent — fetched below
-- Illustration: code-native SVG (halftone shapes), not unDraw — the reference style is print/graphic, not illustrator-figure based
-- Motion: GSAP + ScrollTrigger, scroll-storytelling timeline (this is a marketing/landing screen)
+Beats:
+1. Hook — video-bg hero, headline + one CTA, floating `trading.png` dashboard mockup as the single hero visual
+2. How it works — 3-step mechanism (unchanged copy: Shield → Unlinkable wallet → Trade/launch), paired with `risk_management.svg` as a connector illustration
+3. Why Veyl — icon-card grid (4 cards: e.g. cryptographic privacy, real STRK20 mainnet, sealed-bid fair launch, no custody) — glass cards, icon badges in primary-orange rounded squares, matching reference's "Why Choose" pattern
+4. App embed — the real wallet panel, restyled to the ember/glass theme
+5. Close — credit stamp footer (kept from prior direction, restyled)
 
 ## Dark mode
-Locked dark-only (the entire brand is the olive-ground print aesthetic; no light variant makes sense for this identity).
+Locked dark-only — same as before, now for a different reason (this identity is a near-black ember ground, not the olive one).

@@ -17,5 +17,24 @@
     "contrast": "text-safe, verified via check_contrast.py (main palette + derived muted/success/danger tokens)",
     "critique_scores": { "show_dont_tell": 4, "philosophy": 4, "hierarchy": 4, "specificity": 4, "restraint": 4, "variety": 4 },
     "notes": "Second build in this project (first was a standalone artifact preview, not logged). Reused locked style-lock verbatim for color/type; only beat content changed for the terminal pivot. App shell screen (wallet panel) skipped Step 2.5 per the skill's own rule."
+  },
+  {
+    "date": "2026-08-16",
+    "project": "veyl",
+    "screens": ["landing (marketing narrative)", "app shell (wallet action panel)"],
+    "macrostructure": "bento-dashboard-showcase",
+    "beats": ["hook", "how-it-works", "why", "app-embed", "close"],
+    "archetypes": {
+      "nav": "sticky pill nav (rounded link group)",
+      "hero": "video-bg + floating glass-dashboard mockup, single visual",
+      "feature": "text + connector-illustration split (not sticker-stamped this time)",
+      "proof": "4-up icon-badge card grid (why-choose pattern)",
+      "footer": "credit-stamp pill + link row (kept)"
+    },
+    "palette_seed": "veyl-ember-01 (full pivot, user-directed — extracted via extract_palette.py from design/assets/trading.png, chart.webp, hero_bg frame; NOT regenerated from a mood keyword)",
+    "mood": "premium-fintech (ember/vortex: near-black + single vivid orange accent)",
+    "contrast": "text-safe, verified via check_contrast.py --matrix + two ad hoc checks (muted text, success/danger icon fills)",
+    "critique_scores": { "show_dont_tell": 4, "philosophy": 4, "hierarchy": 4, "specificity": 5, "restraint": 4, "variety": 4 },
+    "notes": "Full supersede of the prior riso/olive direction at the user's explicit request, using real reference images (a Cryptox-style template) plus real provided asset files (hero_bg.mp4, trading.png, chart.webp, risk_management.svg) rather than a text-mediated restyle. hero_bg.mp4 watermark removed via ffmpeg delogo (not cropped/blurred — inpainted using surrounding pixels) before use. trading.png cropped from 1672x941 to 1582x597 (auto-detected content bbox vs. near-black background) after live verification showed ~46% of the original frame was dead black padding, invisible against the equally-dark page background. chart.webp fetched into design/assets but not placed in this pass — available for a future card/stat visual, flagging rather than forcing it in. Live-verified in the running dev server via DOM/computed-style/pixel-sampling checks, not just a build pass, after browser screenshot tooling proved unreliable for scroll verification in this session."
   }
 ]

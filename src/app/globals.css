@@ -1,76 +1,34 @@
+/* Veyl — ember/vortex direction (.tastemaker/style-lock.md, locked 2026-08-16).
+   Palette lives on :root, not scoped to one CSS module, so components used
+   both inside and outside a wrapped panel (e.g. SelectWallet) resolve the
+   same tokens everywhere. */
 :root {
-  --max-width: 1100px;
-  --border-radius: 12px;
-  --font-mono: ui-monospace, Menlo, Monaco, 'Cascadia Mono', 'Segoe UI Mono',
-    'Roboto Mono', 'Oxygen Mono', 'Ubuntu Monospace', 'Source Code Pro',
-    'Fira Mono', 'Droid Sans Mono', 'Courier New', monospace;
+  --bg: #0A0A0A;
+  --surface: #1C1B1A;
+  --surface-2: #262524;
+  --text: #F5F1ED;
+  --muted: #A69C93;
+  --primary: #FF5A2E;
+  --accent: #B23A17;
+  --border: #33302E;
+  --on-primary: #0A0A0A;
 
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-
-  --primary-glow: conic-gradient(
-    from 180deg at 50% 50%,
-    #16abff33 0deg,
-    #0885ff33 55deg,
-    #54d6ff33 120deg,
-    #0071ff33 160deg,
-    transparent 360deg
-  );
-  --secondary-glow: radial-gradient(
-    rgba(255, 255, 255, 1),
-    rgba(255, 255, 255, 0)
-  );
-
-  --tile-start-rgb: 239, 245, 249;
-  --tile-end-rgb: 228, 232, 233;
-  --tile-border: conic-gradient(
-    #00000080,
-    #00000040,
-    #00000030,
-    #00000020,
-    #00000010,
-    #00000010,
-    #00000080
-  );
-
-  --callout-rgb: 238, 240, 241;
-  --callout-border-rgb: 172, 175, 176;
-  --card-rgb: 180, 185, 188;
-  --card-border-rgb: 131, 134, 135;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-
-    --primary-glow: radial-gradient(rgba(1, 65, 255, 0.4), rgba(1, 65, 255, 0));
-    --secondary-glow: linear-gradient(
-      to bottom right,
-      rgba(1, 65, 255, 0),
-      rgba(1, 65, 255, 0),
-      rgba(1, 65, 255, 0.3)
-    );
-
-    --tile-start-rgb: 2, 13, 46;
-    --tile-end-rgb: 2, 5, 19;
-    --tile-border: conic-gradient(
-      #ffffff80,
-      #ffffff40,
-      #ffffff30,
-      #ffffff20,
-      #ffffff10,
-      #ffffff10,
-      #ffffff80
-    );
-
-    --callout-rgb: 20, 20, 20;
-    --callout-border-rgb: 108, 108, 108;
-    --card-rgb: 100, 100, 100;
-    --card-border-rgb: 200, 200, 200;
-  }
+  /* Back-compat aliases so the existing app-shell module (uni.module.css,
+     written against the prior riso palette's variable names) maps onto the
+     new tokens without a full rename pass. */
+  --ink: var(--text);
+  --card: var(--surface);
+  --line: var(--border);
+  --inset: var(--surface);
+  --inset-2: var(--surface-2);
+  --pink: var(--primary);
+  --pink-soft: var(--surface-2);
+  --pink-soft-2: var(--surface-2);
+  --pink-text: var(--primary);
+  --green: #6FBF7A;
+  --green-soft: #16241A;
+  --danger: #E5573A;
+  --on-fill: var(--on-primary);
 }
 
 * {
@@ -91,51 +49,17 @@ body {
   overflow-x: hidden;
 }
 
-/* Veyl is committed to a single dark theme (olive/riso print aesthetic —
-   .tastemaker/style-lock.md). No light variant: the identity IS the dark ground.
-   Palette lives on :root (not scoped to one CSS module) so components like
-   SelectWallet, used both inside and outside uni.module.css's `.page`, resolve
-   the same tokens everywhere. */
-:root {
-  --ink: #F2E9D8;
-  --muted: #C9BFA0;
-  --bg: #33421F;
-  --card: #2A3519;
-  --line: #5C6B3E;
-  --inset: #2E3A1F;
-  --inset-2: #3A4A28;
-  --pink: #C97B5F;
-  --pink-soft: #34291F;
-  --pink-soft-2: #4A3A2C;
-  --pink-text: #D9A79B;
-  --green: #8FAF6B;
-  --green-soft: #263420;
-  --danger: #C97C6B;
-  --on-fill: #1C1C1C;
-}
-
 html {
   color-scheme: dark;
 }
 
 body {
-  color: #F2E9D8;
-  background: #33421F;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--font-body), system-ui, sans-serif;
 }
 
 a {
   color: inherit;
   text-decoration: none;
-}
-
-/* Film grain — shared across every screen, per style-lock's texture system. */
-.veyl-grain {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 40;
-  opacity: 0.14;
-  mix-blend-mode: overlay;
 }
