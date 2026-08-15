@@ -29,6 +29,9 @@ const IconShield = () => (
 const IconActivity = () => (
   <svg viewBox="0 0 32 32" width="26" height="26"><path fill="#FF5A2E" d="M12 29a1 1 0 0 1-.92-.62L6.33 17H2v-2h5a1 1 0 0 1 .92.62L12 25.28l8.06-21.63A1 1 0 0 1 21 3a1 1 0 0 1 .93.68L25.72 15H30v2h-5a1 1 0 0 1-.95-.68L21 7l-8.06 21.35A1 1 0 0 1 12 29"/></svg>
 );
+const IconTerminal = () => (
+  <svg viewBox="0 0 32 32" width="26" height="26"><path fill="#FF5A2E" d="M26 4.01H6a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2v-20a2 2 0 0 0-2-2m0 2v4H6v-4Zm-20 20v-14h20v14Z"/><path fill="#FF5A2E" d="m10.76 16.18l2.82 2.83l-2.82 2.83l1.41 1.41l4.24-4.24l-4.24-4.24z"/></svg>
+);
 
 const WHY = [
   { Icon: IconShield, title: 'Cryptographic privacy', body: 'Sender, recipient, and amount stay encrypted inside the STRK20 pool — not hidden by policy, hidden by math.' },
@@ -128,11 +131,11 @@ export default function Page() {
           <div className={styles.heroScrim} aria-hidden />
 
           <div className={styles.heroContent}>
-            <span className={`${styles.eyebrow} js-eyebrow`}>Built on STRK20 · Starknet Mainnet</span>
+            <span className={`${styles.eyebrow} js-eyebrow`}>The private trading terminal for Starknet</span>
             <h1 className={`${styles.h1} js-h1`}>Step Into The Future<br />Of Private Trading</h1>
             <p className={`${styles.lede} js-lede`}>
-              Shield your funds into the STRK20 pool, then trade and launch from an
-              execution identity that isn&apos;t linkable back to your wallet.
+              Trade any token Starknet has liquidity for — from an execution identity
+              that isn&apos;t linkable back to your funding wallet. Shield once, trade freely.
             </p>
             <div className={`${styles.heroCtas} js-ctas`}>
               <SelectWallet variant="ctaBig" />
@@ -152,32 +155,97 @@ export default function Page() {
           </div>
         </section>
 
-        {/* --- Beat 2: How it works ------------------------------------------ */}
+        {/* --- Beat 2: Positioning — what category this actually is ------------ */}
+        <section className={styles.section}>
+          <div className={`${styles.sectionHead} js-scroll-fade`}>
+            <span className={styles.eyebrow}>What this is</span>
+            <h2 className={styles.h2}>Two things that don&apos;t exist together yet.</h2>
+          </div>
+          <div className={`${styles.positionGrid} js-stagger-group`}>
+            <div className={styles.positionCard}>
+              <IconTerminal />
+              <span className={styles.tag}>Trading terminals</span>
+              <h3>Fast, but public</h3>
+              <p>One-click swaps, market discovery, built for speed. Every trade traces straight back to your wallet.</p>
+            </div>
+            <div className={styles.positionMerge} aria-hidden="true">+</div>
+            <div className={styles.positionCard}>
+              <IconShield />
+              <span className={styles.tag}>Privacy protocols</span>
+              <h3>Private, but not a terminal</h3>
+              <p>Shielded balances, unlinkable transfers. Built as a wallet feature, not a place to trade.</p>
+            </div>
+            <div className={styles.positionResult}>
+              <h3>Veyl is both, at once.</h3>
+              <p>A trading terminal for any token Starknet has liquidity for — where the identity behind every trade is cryptographically unlinkable. Not a launchpad; fair launches are one feature built on the same mechanism.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* --- Beat 3: How it works — two tracks, tagged by how often you'd use them --- */}
         <section id="how" className={styles.section}>
           <div className={`${styles.sectionGrid} js-scroll-fade`}>
             <div className={styles.sectionText}>
               <span className={styles.eyebrow}>How it works</span>
-              <h2 className={styles.h2}>Three steps. No history to sell.</h2>
-              <div className={`${styles.steps} js-stagger-group`}>
-                <div className={styles.step}>
-                  <span className={styles.stepNum}>01</span>
-                  <div>
-                    <h3>Shield</h3>
-                    <p>Deposit into the STRK20 privacy pool. Notes are UTXO-style — consumed whole, re-split as change.</p>
+              <h2 className={styles.h2}>One mechanism. Two tracks.</h2>
+              <p className={styles.sectionSub}>Escrow something, reveal it only at settlement, never expose who&apos;s behind it. Trading uses this constantly; launching uses it once per token.</p>
+
+              <div className={styles.track}>
+                <div className={styles.trackHead}>
+                  <h4>Trade privately</h4>
+                  <span className={`${styles.trackTag} ${styles.everyday}`}>Everyday</span>
+                </div>
+                <div className={`${styles.steps} js-stagger-group`}>
+                  <div className={styles.step}>
+                    <span className={styles.stepNum}>01</span>
+                    <div>
+                      <h3>Shield</h3>
+                      <p>Deposit into the STRK20 privacy pool.</p>
+                    </div>
+                  </div>
+                  <div className={styles.step}>
+                    <span className={styles.stepNum}>02</span>
+                    <div>
+                      <h3>Fresh identity</h3>
+                      <p>A per-trade wallet, generated from your shielded funds, acts for you.</p>
+                    </div>
+                  </div>
+                  <div className={styles.step}>
+                    <span className={styles.stepNum}>03</span>
+                    <div>
+                      <h3>Trade unlinked</h3>
+                      <p>Your funding wallet and your trade are never provably the same address.</p>
+                    </div>
                   </div>
                 </div>
-                <div className={styles.step}>
-                  <span className={styles.stepNum}>02</span>
-                  <div>
-                    <h3>Trade from a fresh identity</h3>
-                    <p>A per-trade execution wallet, generated from your shielded funds, acts on your behalf.</p>
-                  </div>
+              </div>
+
+              <div className={styles.track}>
+                <div className={styles.trackHead}>
+                  <h4>Launch a token</h4>
+                  <span className={`${styles.trackTag} ${styles.occasional}`}>Occasional</span>
                 </div>
-                <div className={styles.step}>
-                  <span className={styles.stepNum}>03</span>
-                  <div>
-                    <h3>Or launch, sealed-bid</h3>
-                    <p>New token launches clear through a sealed round — bids revealed only at settlement.</p>
+                <div className={`${styles.steps} js-stagger-group`}>
+                  <div className={styles.step}>
+                    <span className={styles.stepNum}>01</span>
+                    <div>
+                      <h3>List the launch</h3>
+                      <p>Set the token and terms for a sealed-bid round.</p>
+                    </div>
+                  </div>
+                  <div className={styles.step}>
+                    <span className={styles.stepNum}>02</span>
+                    <div>
+                      <h3>Sealed bids come in</h3>
+                      <p>Real funds, escrowed as encrypted notes — nobody sees the book.</p>
+                    </div>
+                  </div>
+                  <div className={styles.step}>
+                    <span className={styles.stepNum}>03</span>
+                    <div>
+                      <h3>Settles at once</h3>
+                      <p>One clearing price, revealed only at settlement. No first-block snipe.</p>
+                    </div>
                   </div>
                 </div>
               </div>

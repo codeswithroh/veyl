@@ -39,12 +39,15 @@ Note: the old Anton + Instrument Serif pairing (riso direction) is dropped for t
 ## Structure (Step 2.5)
 Macrostructure: **Bento/Dashboard Showcase** hero (video bg + floating glass dashboard cards) → feature grid with connector illustration → "why choose" icon-card grid → app embed → close. Different shape from the prior long-scroll-narrative poster-collage (which is retired), matching the reference's product-showcase rhythm instead of a scroll-story.
 
-Beats:
+Beats (6, updated 2026-08-16 — see below):
 1. Hook — video-bg hero, headline + one CTA, floating `trading.png` dashboard mockup as the single hero visual
-2. How it works — 3-step mechanism (unchanged copy: Shield → Unlinkable wallet → Trade/launch), paired with `risk_management.svg` as a connector illustration
-3. Why Veyl — icon-card grid (4 cards: e.g. cryptographic privacy, real STRK20 mainnet, sealed-bid fair launch, no custody) — glass cards, icon badges in primary-orange rounded squares, matching reference's "Why Choose" pattern
-4. App embed — the real wallet panel, restyled to the ember/glass theme
-5. Close — credit stamp footer (kept from prior direction, restyled)
+2. Positioning — "what category is this": a terminal-category card + a privacy-category card, merged into a "Veyl is both" result card. Added because user tested the live page and couldn't tell if Veyl was a launchpad, a wallet, or a terminal — the page never said so explicitly.
+3. How it works — split into two explicitly tagged tracks (was one ambiguous 3-step flow ending in "or launch", which is exactly what caused the positioning confusion): "Trade privately" (tag: Everyday) and "Launch a token" (tag: Occasional), each its own 3 steps, sharing `risk_management.svg` as one connector illustration
+4. Why Veyl — icon-card grid (4 cards: cryptographic privacy, real STRK20 mainnet, sealed-bid fair launch, no custody) — glass cards, icon badges in primary-orange rounded squares
+5. App embed — the real wallet panel, restyled to the ember/glass theme
+6. Close — credit stamp footer
+
+**2026-08-16 revision note:** content/structure only, no palette or type change. New icons added: `terminal`, `merge` (merge fetched but not used — a plain "+" character read cleaner between the two positioning cards than the git-merge glyph; kept the file on disk, not wired in).
 
 ## Dark mode
 Locked dark-only — same as before, now for a different reason (this identity is a near-black ember ground, not the olive one).
