@@ -50,13 +50,15 @@ Everything in this phase stays on what's already built — no backend yet.
 4. Confirm graceful degradation: detect wallets without STRK20 support via a version query (`supportedWalletApi`/`supportedSpecs`), **never** by probing balances — that triggers a consent prompt for data the app doesn't need yet.
 5. Verify against the Ready extension + https://starknet-wallet-account.vercel.app/
 
-## 6. Phase 2 ⚠️ scaffolded 2026-08-15, blocked — shadow-accounts backend (goal #1: unlinkable execution wallets)
+## 6. Phase 2 🟡 in progress 2026-08-15 — shadow-accounts backend (goal #1: unlinkable execution wallets)
 
-**Blocked on two things only you can clear** — see `server/README.md`:
-1. A GitHub PAT with `read:packages` scope (the SDK is on GitHub's npm registry; `npm install` currently fails `401`).
-2. Explicit go-ahead to deploy a `ShadowAccountAnonymizer` instance on mainnet.
+**Done and verified for real:** GitHub Packages auth cleared (gh token scope upgraded to `read:packages`); `server/` installs, type-checks (`tsc --noEmit` clean against the real installed SDK types — not guessed), builds, and boots; `/health` and the unconfigured-state 503 guardrail on `/shadow-account/trade` both confirmed live. Defaults to **Sepolia** (`VEYL_NETWORK=sepolia`), per the testnet-before-mainnet rule — mainnet is an explicit opt-in via env var, not the default.
 
-`server/src/index.ts` is written against the documented API but has never installed, type-checked, or run. Treat it as a draft, not a working service, until both are cleared.
+**Remaining, blocked on you:**
+1. Deploy a `ShadowAccountAnonymizer` instance to **Sepolia first** (first-party Starkware reference contract, not something Veyl writes — but still a real onchain deployment needing your explicit go).
+2. Fund a Sepolia service account for `VEYL_SERVICE_ACCOUNT_ADDRESS` / `VEYL_SERVICE_ACCOUNT_PRIVATE_KEY`.
+3. Register a viewing key for `VEYL_BACKEND_VIEWING_KEY`.
+4. Once a real Sepolia trade round-trips successfully, repeat the deployment on mainnet — separately, explicitly, not automatically.
 
 This is new infrastructure, not a frontend change. **Two things gate this phase before code runs against anything real:**
 
