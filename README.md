@@ -6,10 +6,13 @@
 
 Trade and launch tokens without your wallet becoming a target — funded through the [STRK20](https://strk20-by-example.org/what-is-strk20) privacy pool, executed from identities nobody can link back to you.
 
+[![Live](https://img.shields.io/badge/live-veyl--tau.vercel.app-FF5A2E)](https://veyl-tau.vercel.app)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Built with Next.js](https://img.shields.io/badge/built%20with-Next.js%2016-black)](https://nextjs.org)
 [![Network](https://img.shields.io/badge/network-Starknet%20Mainnet-29296e)](https://www.starknet.io)
 [![STRK20 Private Sprint](https://img.shields.io/badge/STRK20-Private%20Sprint-c97b5f)](https://github.com/starkience/strk20-hackathon)
+
+**[veyl-tau.vercel.app →](https://veyl-tau.vercel.app)**
 
 </div>
 
@@ -54,7 +57,7 @@ Funding and settlement amounts are visible on Starknet, same as any deposit/with
 
 ## Status
 
-🚧 **Actively building for the STRK20 Private Sprint (14–31 Aug 2026).** This repo currently ships the wallet-connect / shield / unshield / private-transfer base (via [`strk20-starter-kit`](https://github.com/Akashneelesh/strk20-starter-kit)). The fair-launch sealed-bid contract, unlinkable-execution-wallet flow, and Veyl's own UI are in active development — see [`strk20.json`](./strk20.json) for live mainnet transactions and deployed contracts as they land.
+🚧 **Actively building for the STRK20 Private Sprint (14–31 Aug 2026).** Live at [veyl-tau.vercel.app](https://veyl-tau.vercel.app) (auto-deployed from `main`). This repo currently ships the wallet-connect / shield / unshield / private-transfer base (via [`strk20-starter-kit`](https://github.com/Akashneelesh/strk20-starter-kit)) plus the full landing/terminal UI. The fair-launch sealed-bid contract and unlinkable-execution-wallet backend are in active development — see [`strk20.json`](./strk20.json) for live mainnet transactions and deployed contracts as they land.
 
 ## Tech stack
 
