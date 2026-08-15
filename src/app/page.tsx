@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import Image from 'next/image';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import styles from './veyl.module.css';
 import panelStyles from './uni.module.css';
 import SelectWallet from './components/client/WalletHandle/SelectWallet';
@@ -36,30 +38,70 @@ const WHY = [
 ];
 
 export default function Page() {
-  useEffect(() => {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const els = document.querySelectorAll<HTMLElement>('[data-reveal]');
-    if (reduce || !('IntersectionObserver' in window)) {
-      els.forEach((el) => el.classList.add(styles.in));
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add(styles.in);
-            io.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0, rootMargin: '0px 0px -15% 0px' }
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+  const root = useRef<HTMLDivElement>(null);
+
+  // GSAP + ScrollTrigger, per .tastemaker/style-lock.md's motion spec for this
+  // marketing screen: a sequenced hero entrance timeline (above the fold, plays
+  // once on load) + scroll-triggered staggered reveals for everything below.
+  // useLayoutEffect + gsap.set-before-paint means no CSS opacity:0 fallback is
+  // needed — GSAP owns the initial hidden state, so there's no FOUC either way.
+  useLayoutEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+
+    const ctx = gsap.context(() => {
+      const mm = gsap.matchMedia();
+      mm.add(
+        {
+          motionOK: '(prefers-reduced-motion: no-preference)',
+          reduceMotion: '(prefers-reduced-motion: reduce)',
+        },
+        (context) => {
+          const { reduceMotion } = context.conditions as { reduceMotion: boolean };
+          const dur = reduceMotion ? 0.01 : 0.7;
+          const shortDur = reduceMotion ? 0.01 : 0.55;
+          const stagger = reduceMotion ? 0 : 0.12;
+
+          // Sequenced hero entrance — plays once, above the fold, no scroll needed.
+          gsap
+            .timeline({ defaults: { ease: 'power3.out', duration: dur } })
+            .from('.js-eyebrow', { opacity: 0, y: 16 })
+            .from('.js-h1', { opacity: 0, y: 24 }, '-=0.45')
+            .from('.js-lede', { opacity: 0, y: 16 }, '-=0.4')
+            .from('.js-ctas', { opacity: 0, y: 16 }, '-=0.35')
+            .from('.js-dashboard', { opacity: 0, y: 48, scale: 0.98 }, '-=0.3');
+
+          // Scroll-triggered single-element fades (section heads, connector art).
+          gsap.utils.toArray<HTMLElement>('.js-scroll-fade').forEach((el) => {
+            gsap.from(el, {
+              opacity: 0,
+              y: 24,
+              duration: shortDur,
+              ease: 'power2.out',
+              scrollTrigger: { trigger: el, start: 'top 85%', once: true },
+            });
+          });
+
+          // Scroll-triggered staggered groups (the 3 how-it-works steps, the 4
+          // why-cards) — each child fades/lifts in slightly after the last.
+          gsap.utils.toArray<HTMLElement>('.js-stagger-group').forEach((group) => {
+            gsap.from(group.children, {
+              opacity: 0,
+              y: 20,
+              duration: shortDur,
+              ease: 'power2.out',
+              stagger,
+              scrollTrigger: { trigger: group, start: 'top 85%', once: true },
+            });
+          });
+        }
+      );
+    }, root);
+
+    return () => ctx.revert();
   }, []);
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} ref={root}>
       <header className={styles.nav}>
         <a href="#top" className={styles.wordmark}>VEYL</a>
         <nav className={styles.navLinks}>
@@ -85,22 +127,22 @@ export default function Page() {
           />
           <div className={styles.heroScrim} aria-hidden />
 
-          <div className={`${styles.heroContent} ${styles.reveal}`} data-reveal>
-            <span className={styles.eyebrow}>Built on STRK20 · Starknet Mainnet</span>
-            <h1 className={styles.h1}>Step Into The Future<br />Of Private Trading</h1>
-            <p className={styles.lede}>
+          <div className={styles.heroContent}>
+            <span className={`${styles.eyebrow} js-eyebrow`}>Built on STRK20 · Starknet Mainnet</span>
+            <h1 className={`${styles.h1} js-h1`}>Step Into The Future<br />Of Private Trading</h1>
+            <p className={`${styles.lede} js-lede`}>
               Shield your funds into the STRK20 pool, then trade and launch from an
               execution identity that isn&apos;t linkable back to your wallet.
             </p>
-            <div className={styles.heroCtas}>
+            <div className={`${styles.heroCtas} js-ctas`}>
               <SelectWallet variant="ctaBig" />
               <a href="#how" className={styles.btnGhost}>See how it works →</a>
             </div>
           </div>
 
-          <div className={`${styles.dashboardFloat} ${styles.reveal}`} data-reveal>
+          <div className={`${styles.dashboardFloat} js-dashboard`}>
             <Image
-              src="/media/trading-dashboard-cropped.png"
+              src="/media/trading-dashboard-transparent.png"
               alt="Veyl trading dashboard preview — markets, balance, exchange panels"
               width={1582}
               height={597}
@@ -112,11 +154,11 @@ export default function Page() {
 
         {/* --- Beat 2: How it works ------------------------------------------ */}
         <section id="how" className={styles.section}>
-          <div className={`${styles.sectionGrid} ${styles.reveal}`} data-reveal>
+          <div className={`${styles.sectionGrid} js-scroll-fade`}>
             <div className={styles.sectionText}>
               <span className={styles.eyebrow}>How it works</span>
               <h2 className={styles.h2}>Three steps. No history to sell.</h2>
-              <div className={styles.steps}>
+              <div className={`${styles.steps} js-stagger-group`}>
                 <div className={styles.step}>
                   <span className={styles.stepNum}>01</span>
                   <div>
@@ -140,7 +182,7 @@ export default function Page() {
                 </div>
               </div>
             </div>
-            <div className={styles.connectorWrap}>
+            <div className={`${styles.connectorWrap} js-scroll-fade`}>
               <Image
                 src="/media/risk-management.svg"
                 alt="Diagram: two wallets connecting through Veyl's privacy layer"
@@ -154,11 +196,11 @@ export default function Page() {
 
         {/* --- Beat 3: Why Veyl ------------------------------------------------ */}
         <section id="why" className={styles.section}>
-          <div className={`${styles.sectionHead} ${styles.reveal}`} data-reveal>
+          <div className={`${styles.sectionHead} js-scroll-fade`}>
             <span className={styles.eyebrow}>Why Veyl</span>
             <h2 className={styles.h2}>Privacy without the trust fall.</h2>
           </div>
-          <div className={`${styles.whyGrid} ${styles.reveal}`} data-reveal>
+          <div className={`${styles.whyGrid} js-stagger-group`}>
             {WHY.map(({ Icon, title, body }) => (
               <div className={styles.whyCard} key={title}>
                 <div className={styles.whyIconBadge}><Icon /></div>
@@ -171,7 +213,7 @@ export default function Page() {
 
         {/* --- Beat 4: App embed ------------------------------------------------ */}
         <section id="app" className={styles.appSection}>
-          <div className={`${styles.sectionHead} ${styles.reveal}`} data-reveal>
+          <div className={`${styles.sectionHead} js-scroll-fade`}>
             <span className={styles.eyebrow}>Try it live</span>
             <h2 className={styles.h2}>Wired to the real STRK20 mainnet pool.</h2>
           </div>
@@ -182,7 +224,7 @@ export default function Page() {
       </main>
 
       {/* --- Beat 5: Close --------------------------------------------------- */}
-      <footer className={styles.footer}>
+      <footer className={`${styles.footer} js-scroll-fade`}>
         <span className={styles.creditStamp}>
           <IconTimer /> Cleared on Starknet · STRK20 mainnet pool
         </span>

@@ -194,10 +194,8 @@
 .footerLinks a:hover { text-decoration: underline; }
 .footerDot { color: var(--border); }
 
-/* --- Scroll reveal (App Router client component, IntersectionObserver) ----- */
-.reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.5s ease, transform 0.5s ease; }
-.reveal.in { opacity: 1; transform: translateY(0); }
-
-@media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
-}
+/* Motion is GSAP + ScrollTrigger now (page.tsx), not CSS transitions — targets
+   are the js-eyebrow/js-h1/js-lede/js-ctas/js-dashboard/js-scroll-fade/
+   js-stagger-group hooks. GSAP owns the hidden->visible state directly (set
+   before paint via useLayoutEffect), so no CSS opacity:0 fallback is needed
+   here, and reduced-motion is handled in JS via gsap.matchMedia(). */
