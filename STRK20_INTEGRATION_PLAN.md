@@ -14,7 +14,7 @@ Generated 2026-08-14 by the strk20-privacy-integration skill. Statuses below wer
 
 ## 2. Chosen route: Mixed — SDK route (own backend) for sub-accounts, Wallet API for user-facing shield/transfer/unshield, anonymizer contract for fair-launch settlement
 
-Goal #1 (unlinkable execution wallet per trade) is the sub-accounts primitive. The Wallet API route can't do this yet — no `types-js@0.10.3` or starknet.js method exposes it, it's tracked as "coming soon" on that path. The SDK route ships a working sub-account API (`subaccounts(dappName).invoke`, since `0.14.3-rc.4`) for teams that hold their own viewing keys. **You confirmed Veyl will run its own backend service to hold viewing keys** — that's what makes goal #1 buildable now instead of blocked.
+Goal #1 (unlinkable execution wallet per trade) is the sub-accounts primitive — **renamed "shadow accounts" across the whole SDK surface in `0.14.3-RC.5`** (re-verified 2026-08-15; `SubAccount`→`ShadowAccount`, `build().subaccounts(dappName)`→`build().shadowAccounts(dappName)`, config key `subAccountAnonymizerAddress`→`shadowAccountAnonymizerAddress`, Cairo package `sub_account_anonymizer`→`shadow_account_anonymizer`, contract `SubAccountAnonymizer`→`ShadowAccountAnonymizer`). The Wallet API route still can't do this — no `types-js@0.10.3` or starknet.js method exposes it. The SDK route ships a working shadow-account API for teams that hold their own viewing keys. **You confirmed Veyl will run its own backend service to hold viewing keys** — that's what makes goal #1 buildable now instead of blocked.
 
 Goals #2 (fair-launch bids) and #3 (balances/transfers) don't need that: #3 stays on the Wallet API, exactly as the repo already does it — the frontend never touches a key. #2 needs its own anonymizer contract (open notes + `InvokeExternal`), which the SDK-holding backend or the user's wallet can call into depending on which side settles the round — designed in Phase 3, contract itself is Veyl's own code to write/audit.
 
@@ -50,15 +50,27 @@ Everything in this phase stays on what's already built — no backend yet.
 4. Confirm graceful degradation: detect wallets without STRK20 support via a version query (`supportedWalletApi`/`supportedSpecs`), **never** by probing balances — that triggers a consent prompt for data the app doesn't need yet.
 5. Verify against the Ready extension + https://starknet-wallet-account.vercel.app/
 
-## 6. Phase 2 — sub-accounts backend (goal #1: unlinkable execution wallets)
+## 6. Phase 2 ⚠️ scaffolded 2026-08-15, blocked — shadow-accounts backend (goal #1: unlinkable execution wallets)
 
-This is new infrastructure, not a frontend change:
+**Blocked on two things only you can clear** — see `server/README.md`:
+1. A GitHub PAT with `read:packages` scope (the SDK is on GitHub's npm registry; `npm install` currently fails `401`).
+2. Explicit go-ahead to deploy a `ShadowAccountAnonymizer` instance on mainnet.
 
-1. Stand up a minimal backend service (owns exactly one job: hold a viewing key, call `subaccounts(dappName).invoke` via the Privacy SDK to generate/operate per-trade sub-accounts).
+`server/src/index.ts` is written against the documented API but has never installed, type-checked, or run. Treat it as a draft, not a working service, until both are cleared.
+
+This is new infrastructure, not a frontend change. **Two things gate this phase before code runs against anything real:**
+
+- **Node ≥ 24 required by the SDK; this dev machine runs Node 22.18.0.** Scoped via `server/.nvmrc` (nvm install, not a global bump) rather than touching the frontend's runtime.
+- **A `ShadowAccountAnonymizer` contract instance must be deployed before `shadowAccounts(dappName)` will do anything** — calling it without `shadowAccountAnonymizerAddress` configured throws. This is a first-party Starkware reference contract (`packages/shadow_account_anonymizer` in the public monorepo), not something Veyl writes from scratch, but deploying an instance is still a real mainnet action with a real address and needs your explicit go — not something to do silently mid-phase.
+
+Steps:
+
+1. Scaffold the backend service (owns exactly one job: hold a viewing key, call `build().shadowAccounts(dappName).invoke(...)` via the Privacy SDK to generate/operate per-trade shadow accounts).
 2. Key custody: **env var / secrets manager only, never written to a repo file, never logged.** This is the one place in the stack a secret legitimately exists — treat it like the production credential it is.
-3. Frontend calls the backend to request a sub-account for a trade; the backend never exposes the viewing key itself back to the client.
+3. Frontend calls the backend to request a shadow account for a trade; the backend never exposes the viewing key itself back to the client.
 4. Design the trust-boundary disclosure copy now (see §3's honest-limits note) — this ships in the UI wherever Veyl claims "unlinkable," not as a footnote.
-5. Manual verification: confirm a sub-account trade's funding wallet is genuinely unlinkable to an outside observer of the pool, while confirming (internally) the backend's own mapping is correct.
+5. **Stop before deployment or any mainnet call** — hand off to you for the go/no-go on deploying the `ShadowAccountAnonymizer` instance and funding it.
+6. Manual verification (post-deploy): confirm a shadow-account trade's funding wallet is genuinely unlinkable to an outside observer of the pool, while confirming (internally) the backend's own mapping is correct.
 
 ## 7. Phase 3 — fair-launch anonymizer contract (goal #2, tracked)
 
