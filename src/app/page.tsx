@@ -2,12 +2,11 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import styles from './veyl.module.css';
-import panelStyles from './uni.module.css';
 import SelectWallet from './components/client/WalletHandle/SelectWallet';
-import WalletAccountV6Tag from './components/client/WalletHandle/WalletAccountV6Tag';
 
 // --- Inlined Iconify (carbon set) icons — design/assets/icons/*.svg, recolored
 // to the locked ember primary (#FF5A2E) at fetch time. ---
@@ -141,7 +140,7 @@ export default function Page() {
           <nav className={styles.navLinks}>
             <a href="#how">How it works</a>
             <a href="#why">Why Veyl</a>
-            <a href="#app">App</a>
+            <Link href="/dashboard">App</Link>
           </nav>
           <SelectWallet variant="nav" />
         </div>
@@ -311,14 +310,13 @@ export default function Page() {
           </div>
         </section>
 
-        {/* --- Beat 4: App embed ------------------------------------------------ */}
+        {/* --- Beat 4: App teaser -> dashboard ----------------------------------- */}
         <section id="app" className={styles.appSection}>
-          <div className={`${styles.sectionHead} js-scroll-fade`}>
+          <div className={`${styles.teaserCard} js-scroll-fade`}>
             <span className={styles.eyebrow}>Try it live</span>
             <h2 className={styles.h2}>Wired to the real STRK20 mainnet pool.</h2>
-          </div>
-          <div className={panelStyles.page} style={{ minHeight: 'auto', padding: '0 0 40px', background: 'transparent' }}>
-            <WalletAccountV6Tag />
+            <p>Connect a wallet to shield, unshield, and privately transfer — you&apos;ll land straight in the dashboard.</p>
+            <Link href="/dashboard" className={styles.btnGhost}>Open dashboard →</Link>
           </div>
         </section>
 
@@ -394,7 +392,7 @@ export default function Page() {
             <ul>
               <li><a href="#how">How it works</a></li>
               <li><a href="#why">Why Veyl</a></li>
-              <li><a href="#app">Try it live</a></li>
+              <li><Link href="/dashboard">Try it live</Link></li>
               <li><a href="#faq">FAQ</a></li>
             </ul>
           </div>

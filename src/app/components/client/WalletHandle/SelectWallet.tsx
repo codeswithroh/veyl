@@ -3,6 +3,7 @@ import styles from "../../../uni.module.css";
 import { useStoreWallet } from "../../Wallet/walletContext";
 import { useFrontendProvider } from "../provider/providerContext";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { walletV6, validateAndParseAddress, constants as SNconstants, WalletAccountV6 } from "starknet";
 import { WALLET_API } from "@starknet-io/types-js";
 import { myFrontendProviders } from "@/utils/constants";
@@ -21,6 +22,7 @@ function normalizeId(s: string): string {
 
 export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" | "ctaBig" | "ctaCompact" }) {
 
+  const router = useRouter();
   const setMyWallet = useStoreWallet(state => state.setMyStarknetWalletObject);
 
   const setMyWalletAccount = useStoreWallet(state => state.setMyWalletAccount);
@@ -107,6 +109,7 @@ export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" |
     try {
       await handleSelectedWallet(w);
       setPickerOpen(false);
+      router.push("/dashboard");
     } catch (err: any) {
       console.log("Wallet connection failed.\n", err);
       setError(err?.message ?? "Wallet connection failed.");

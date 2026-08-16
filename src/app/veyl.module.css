@@ -55,7 +55,10 @@
 /* --- Hero: video bg + floating dashboard mockup --------------------------- */
 .hero {
   position: relative;
-  padding: 96px 24px 0;
+  /* Nav is fixed/floating now (~78px tall) — hero needs real clearance below
+     it, not just section rhythm. Pivotal section per style-lock's spacing
+     rule: space-32-48 (128-192px), not the connective-section default. */
+  padding: 176px 24px 0;
   overflow: hidden;
   min-height: 640px;
   display: flex;
@@ -224,6 +227,15 @@
 
 /* app embed */
 .appSection { position: relative; padding: 96px 24px 64px; max-width: 1200px; margin: 0 auto; }
+.teaserCard {
+  max-width: 640px; margin: 0 auto; text-align: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 24px;
+  padding: 56px 32px;
+}
+.teaserCard .eyebrow { margin-bottom: 16px; }
+.teaserCard .h2 { margin-bottom: 12px; }
+.teaserCard p { font-size: 0.95rem; color: var(--muted); margin-bottom: 28px; }
+.teaserCard .btnGhost { display: inline-flex; }
 
 /* --- FAQ ------------------------------------------------------------------ */
 .faqList { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
