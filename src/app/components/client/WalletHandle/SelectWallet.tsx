@@ -19,7 +19,7 @@ function normalizeId(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" | "ctaBig" }) {
+export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" | "ctaBig" | "ctaCompact" }) {
 
   const setMyWallet = useStoreWallet(state => state.setMyStarknetWalletObject);
 
@@ -186,11 +186,14 @@ export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" |
     );
   }
 
-  // Default (ctaBig): the large solid connect CTA shown in the panel until a
-  // wallet is connected.
+  // ctaBig: full-width, sized for the narrow app panel. ctaCompact: same
+  // button, content-sized for wide marketing contexts (hero, close CTA).
   return (
     <>
-      <button className={styles.btnCta} onClick={openPicker}>
+      <button
+        className={variant === "ctaCompact" ? `${styles.btnCta} ${styles.btnCtaCompact}` : styles.btnCta}
+        onClick={openPicker}
+      >
         Connect a Wallet
       </button>
       {picker}

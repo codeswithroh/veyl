@@ -392,6 +392,17 @@
   cursor: pointer;
   transition: transform 120ms ease;
 }
+/* Marketing contexts (hero, close CTA) are much wider than the app panel this
+   button was designed for — full-width there looks correct, full-width in a
+   1080px card does not. Same button, sized to its content instead. */
+.btnCtaCompact {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 36px;
+  margin-top: 0;
+}
 @media (hover: hover) and (pointer: fine) {
   .btnCta:not(:disabled):hover { filter: brightness(1.06); }
 }

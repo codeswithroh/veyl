@@ -136,13 +136,15 @@ export default function Page() {
   return (
     <div className={styles.page} ref={root}>
       <header className={styles.nav}>
-        <a href="#top" className={styles.wordmark}>VEYL</a>
-        <nav className={styles.navLinks}>
-          <a href="#how">How it works</a>
-          <a href="#why">Why Veyl</a>
-          <a href="#app">App</a>
-        </nav>
-        <SelectWallet variant="nav" />
+        <div className={styles.navInner}>
+          <a href="#top" className={styles.wordmark}>VEYL</a>
+          <nav className={styles.navLinks}>
+            <a href="#how">How it works</a>
+            <a href="#why">Why Veyl</a>
+            <a href="#app">App</a>
+          </nav>
+          <SelectWallet variant="nav" />
+        </div>
       </header>
 
       <main id="top">
@@ -168,7 +170,7 @@ export default function Page() {
               that isn&apos;t linkable back to your funding wallet. Shield once, trade freely.
             </p>
             <div className={`${styles.heroCtas} js-ctas`}>
-              <SelectWallet variant="ctaBig" />
+              <SelectWallet variant="ctaCompact" />
               <a href="#how" className={styles.btnGhost}>See how it works →</a>
             </div>
           </div>
@@ -371,7 +373,7 @@ export default function Page() {
             <h2>Trade without being watched.</h2>
             <p>Shield once, then trade freely — wired to the real STRK20 mainnet pool.</p>
             <div className={styles.heroCtas}>
-              <SelectWallet variant="ctaBig" />
+              <SelectWallet variant="ctaCompact" />
             </div>
           </div>
         </section>

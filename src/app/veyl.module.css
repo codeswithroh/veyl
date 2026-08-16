@@ -9,11 +9,19 @@
 
 .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
-/* --- Nav ------------------------------------------------------------------ */
+/* --- Nav: fixed, translucent, floats over the hero video ------------------ */
 .nav {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 30;
+  background: rgba(10, 10, 10, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(51, 48, 46, 0.6);
+}
+.navInner {
   display: flex;
   align-items: center;
   justify-content: space-between;
