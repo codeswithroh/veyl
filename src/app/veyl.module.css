@@ -217,15 +217,64 @@
 /* app embed */
 .appSection { position: relative; padding: 96px 24px 64px; max-width: 1200px; margin: 0 auto; }
 
+/* --- FAQ ------------------------------------------------------------------ */
+.faqList { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.faqItem { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.faqQuestion {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 20px 24px; background: none; border: none; text-align: left; cursor: pointer;
+  font-family: var(--font-body), sans-serif; font-size: 0.98rem; font-weight: 600; color: var(--text);
+}
+.faqIcon {
+  flex: none; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--primary); transition: transform 160ms ease;
+}
+.faqIcon svg { width: 14px; height: 14px; }
+.faqIcon svg path { fill: var(--on-primary) !important; }
+.faqItem[data-open="true"] .faqIcon { transform: rotate(180deg); }
+.faqAnswer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms ease; }
+.faqItem[data-open="true"] .faqAnswer { grid-template-rows: 1fr; }
+.faqAnswerInner { overflow: hidden; }
+.faqAnswerInner p { padding: 0 24px 20px; font-size: 0.9rem; color: var(--muted); line-height: 1.6; }
+
+/* --- Close CTA -------------------------------------------------------------- */
+.ctaCard {
+  position: relative; overflow: hidden; max-width: 1080px; margin: 0 auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 28px;
+  padding: 72px 24px; text-align: center;
+}
+.ctaLines { position: absolute; inset: 0; opacity: 0.5; pointer-events: none; }
+.ctaGlow {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(50% 60% at 85% 100%, rgba(255,90,46,0.25), transparent 70%);
+}
+.ctaCard h2 { position: relative; font-family: var(--font-display), sans-serif; font-weight: 800; font-size: clamp(1.8rem, 4vw, 2.6rem); color: var(--text); margin-bottom: 12px; }
+.ctaCard p { position: relative; font-size: 1rem; color: var(--muted); margin-bottom: 32px; }
+.ctaCard .heroCtas { position: relative; }
+
 /* --- Footer ------------------------------------------------------------------ */
-.footer { position: relative; border-top: 1px solid var(--border); padding: 48px 24px 64px; text-align: center; }
+.footer { position: relative; border-top: 1px solid var(--border); padding: 64px 24px 40px; }
+.footerGrid { display: grid; gap: 40px; max-width: 1200px; margin: 0 auto 48px; }
+@media (min-width: 760px) { .footerGrid { grid-template-columns: 1.3fr 1fr 1fr; } }
+.footerBrand .wordmark { display: inline-block; margin-bottom: 12px; }
+.footerBrand p { font-size: 0.9rem; color: var(--muted); max-width: 32ch; line-height: 1.5; margin-bottom: 20px; }
+.footerCol h4 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); margin-bottom: 16px; }
+.footerCol ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.footerCol a { font-size: 0.9rem; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.footerCol a:hover { color: var(--primary); }
+.footerCol a svg { width: 14px; height: 14px; }
+
 .creditStamp {
   display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 999px; padding: 8px 18px 8px 14px; font-size: 13px; color: var(--text); font-weight: 600;
 }
 .creditStamp svg { width: 16px; height: 16px; }
-.footerLinks { margin-top: 20px; font-size: 13px; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.footerBottom {
+  max-width: 1200px; margin: 0 auto; padding-top: 32px; border-top: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+}
+.footerLinks { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .footerLinks a { color: var(--primary); }
 .footerLinks a:hover { text-decoration: underline; }
 .footerDot { color: var(--border); }

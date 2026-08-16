@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -32,6 +32,12 @@ const IconActivity = () => (
 const IconTerminal = () => (
   <svg viewBox="0 0 32 32" width="26" height="26"><path fill="#FF5A2E" d="M26 4.01H6a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2v-20a2 2 0 0 0-2-2m0 2v4H6v-4Zm-20 20v-14h20v14Z"/><path fill="#FF5A2E" d="m10.76 16.18l2.82 2.83l-2.82 2.83l1.41 1.41l4.24-4.24l-4.24-4.24z"/></svg>
 );
+const IconChevronDown = () => (
+  <svg viewBox="0 0 32 32"><path fill="#FF5A2E" d="M16 22L6 12l1.4-1.4l8.6 8.6l8.6-8.6L26 12z"/></svg>
+);
+const IconGithub = () => (
+  <svg viewBox="0 0 32 32"><path fill="#FF5A2E" fillRule="evenodd" d="M16 2a14 14 0 0 0-4.43 27.28c.7.13 1-.3 1-.67v-2.38c-3.89.84-4.71-1.88-4.71-1.88a3.7 3.7 0 0 0-1.62-2.05c-1.27-.86.1-.85.1-.85a2.94 2.94 0 0 1 2.14 1.45a3 3 0 0 0 4.08 1.16a2.93 2.93 0 0 1 .88-1.87c-3.1-.36-6.37-1.56-6.37-6.92a5.4 5.4 0 0 1 1.44-3.76a5 5 0 0 1 .14-3.7s1.17-.38 3.85 1.43a13.3 13.3 0 0 1 7 0c2.67-1.81 3.84-1.43 3.84-1.43a5 5 0 0 1 .14 3.7a5.4 5.4 0 0 1 1.44 3.76c0 5.38-3.27 6.56-6.39 6.91a3.33 3.33 0 0 1 .95 2.59v3.84c0 .46.25.81 1 .67A14 14 0 0 0 16 2"/></svg>
+);
 
 const WHY = [
   { Icon: IconShield, title: 'Cryptographic privacy', body: 'Sender, recipient, and amount stay encrypted inside the STRK20 pool — not hidden by policy, hidden by math.' },
@@ -40,8 +46,32 @@ const WHY = [
   { Icon: IconLocked, title: 'You hold the keys', body: 'Veyl never custodies funds. Shield and trade through your own wallet, end to end.' },
 ];
 
+const FAQ = [
+  {
+    q: 'Is Veyl a launchpad?',
+    a: "No — Veyl is a private trading terminal. Fair launches are one feature built on the same sealed-bid mechanism, not the product itself.",
+  },
+  {
+    q: 'Which tokens can I trade?',
+    a: 'Any token Starknet has liquidity for. Memecoins are the sharpest early use case, not a limit — Veyl is a privacy and execution layer, not a fixed token list.',
+  },
+  {
+    q: "How is this different from just shielding funds in my wallet?",
+    a: "Wallets are explicitly barred from touching your viewing key, so they can't generate the unlinkable per-trade identity Veyl uses, or run a sealed-bid launch. That needs a backend — which is what Veyl adds on top of the wallet-native shield/unshield you already have.",
+  },
+  {
+    q: 'Does Veyl custody my funds?',
+    a: 'No. You shield and trade through your own connected wallet, end to end. Veyl never holds your assets.',
+  },
+  {
+    q: 'Is this live on mainnet?',
+    a: 'The shield, unshield, and private-transfer base runs on the real STRK20 mainnet pool today. The unlinkable-execution-wallet backend and the fair-launch contract are still in active development — see the repo for current status.',
+  },
+];
+
 export default function Page() {
   const root = useRef<HTMLDivElement>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   // GSAP + ScrollTrigger, per .tastemaker/style-lock.md's motion spec for this
   // marketing screen: a sequenced hero entrance timeline (above the fold, plays
@@ -289,17 +319,99 @@ export default function Page() {
             <WalletAccountV6Tag />
           </div>
         </section>
+
+        {/* --- Beat 5: FAQ ------------------------------------------------------ */}
+        <section id="faq" className={styles.section}>
+          <div className={`${styles.sectionHead} js-scroll-fade`}>
+            <span className={styles.eyebrow}>FAQ</span>
+            <h2 className={styles.h2}>Questions worth answering straight.</h2>
+          </div>
+          <div className={`${styles.faqList} js-stagger-group`}>
+            {FAQ.map(({ q, a }, i) => {
+              const open = openFaq === i;
+              return (
+                <div className={styles.faqItem} data-open={open} key={q}>
+                  <button
+                    type="button"
+                    className={styles.faqQuestion}
+                    aria-expanded={open}
+                    onClick={() => setOpenFaq(open ? null : i)}
+                  >
+                    <span>{q}</span>
+                    <span className={styles.faqIcon}><IconChevronDown /></span>
+                  </button>
+                  <div className={styles.faqAnswer}>
+                    <div className={styles.faqAnswerInner}>
+                      <p>{a}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* --- Beat 6: Close CTA -------------------------------------------------- */}
+        <section className={styles.section}>
+          <div className={`${styles.ctaCard} js-scroll-fade`}>
+            <div className={styles.ctaGlow} aria-hidden="true" />
+            <svg className={styles.ctaLines} viewBox="0 0 1080 320" aria-hidden="true">
+              <g stroke="#FF5A2E" strokeWidth="1" fill="none" opacity="0.35">
+                <path d="M900 0 L900 60 L960 120 L960 200 L1020 260 L1020 320" />
+                <path d="M980 0 L980 40 L1040 100 L1040 320" />
+                <path d="M840 0 L840 80 L900 140 L900 320" />
+              </g>
+              <g fill="#FF5A2E" opacity="0.5">
+                <circle cx="960" cy="120" r="3" />
+                <circle cx="1020" cy="260" r="3" />
+                <circle cx="1040" cy="100" r="3" />
+                <circle cx="900" cy="140" r="3" />
+              </g>
+            </svg>
+            <h2>Trade without being watched.</h2>
+            <p>Shield once, then trade freely — wired to the real STRK20 mainnet pool.</p>
+            <div className={styles.heroCtas}>
+              <SelectWallet variant="ctaBig" />
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* --- Beat 5: Close --------------------------------------------------- */}
-      <footer className={`${styles.footer} js-scroll-fade`}>
-        <span className={styles.creditStamp}>
-          <IconTimer /> Cleared on Starknet · STRK20 mainnet pool
-        </span>
-        <div className={styles.footerLinks}>
-          <a href="https://github.com/codeswithroh/veyl" target="_blank" rel="noreferrer">Repo</a>
-          <span className={styles.footerDot}>·</span>
-          <span>Built on Starknet.js v10.4.0 + STRK20</span>
+      {/* --- Footer --------------------------------------------------------- */}
+      <footer className={styles.footer}>
+        <div className={`${styles.footerGrid} js-scroll-fade`}>
+          <div className={styles.footerBrand}>
+            <span className={styles.wordmark}>VEYL</span>
+            <p>Private launch &amp; trading terminal on Starknet, built on the STRK20 privacy pool.</p>
+            <span className={styles.creditStamp}>
+              <IconTimer /> Cleared on Starknet
+            </span>
+          </div>
+          <div className={styles.footerCol}>
+            <h4>Product</h4>
+            <ul>
+              <li><a href="#how">How it works</a></li>
+              <li><a href="#why">Why Veyl</a></li>
+              <li><a href="#app">Try it live</a></li>
+              <li><a href="#faq">FAQ</a></li>
+            </ul>
+          </div>
+          <div className={styles.footerCol}>
+            <h4>Resources</h4>
+            <ul>
+              <li><a href="https://github.com/codeswithroh/veyl" target="_blank" rel="noreferrer"><IconGithub /> Repo</a></li>
+              <li><a href="https://strk20-by-example.org/what-is-strk20" target="_blank" rel="noreferrer">STRK20 docs</a></li>
+              <li><a href="https://www.starknet.io" target="_blank" rel="noreferrer">Starknet</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className={styles.footerBottom}>
+          <div className={styles.footerLinks}>
+            <span>Built on Starknet.js v10.4.0 + STRK20</span>
+          </div>
+          <div className={styles.footerLinks}>
+            <a href="https://github.com/codeswithroh/veyl/blob/main/LICENSE" target="_blank" rel="noreferrer">MIT licensed</a>
+          </div>
         </div>
       </footer>
     </div>
