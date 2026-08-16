@@ -3,12 +3,34 @@
 import { useEffect, useState } from "react";
 import { hash, json, num, shortString, validateAndParseAddress } from "starknet";
 import type { WALLET_API } from "@starknet-io/types-js";
+import {
+  getQuotes,
+  fetchTokens,
+  createStrk20WalletProver,
+  executePrivateSwap,
+  BASE_URL,
+  PAYMASTER_BASE_URL,
+  PRIVACY_POOL_ADDRESS,
+  SEPOLIA_BASE_URL,
+  SEPOLIA_PAYMASTER_BASE_URL,
+  SEPOLIA_PRIVACY_POOL_ADDRESS,
+  type Quote,
+  type Token,
+} from "@avnu/avnu-sdk";
 import styles from "../../../uni.module.css";
 import * as constants from "@/utils/constants";
 import { useStoreWallet } from "../../Wallet/walletContext";
 import { useFrontendProvider } from "../provider/providerContext";
 import { StrkCoin } from "../../TokenIcons";
 import SelectWallet from "./SelectWallet";
+
+// AVNU config per frontend provider index (0 = Mainnet, 2 = Sepolia — same
+// indices as constants.Strk20Networks). Real private swaps: AVNU's own
+// executor + STRK20 pool, no anonymizer contract of ours required.
+const AVNU_CONFIG: Record<number, { baseUrl: string; paymasterBaseUrl: string; poolAddress: string }> = {
+  0: { baseUrl: BASE_URL, paymasterBaseUrl: PAYMASTER_BASE_URL, poolAddress: PRIVACY_POOL_ADDRESS },
+  2: { baseUrl: SEPOLIA_BASE_URL, paymasterBaseUrl: SEPOLIA_PAYMASTER_BASE_URL, poolAddress: SEPOLIA_PRIVACY_POOL_ADDRESS },
+};
 
 // DEMO: all actions use one token (STRK). Swap constants.addrSTRK for your token,
 // or make the token a user selection.
@@ -21,8 +43,14 @@ const ONE_STRK = 1n * 10n ** 18n;
 
 // Format a felt amount (STRK, 18 decimals) as a human STRK string ("10", "1.5").
 function fmtStrk(amount: bigint): string {
-  const whole = amount / 10n ** 18n;
-  const frac = (amount % 10n ** 18n).toString().padStart(18, "0").replace(/0+$/, "");
+  return fmtUnits(amount, 18);
+}
+
+// Format a raw token amount at any decimals as a human string ("10", "1.5").
+function fmtUnits(amount: bigint, decimals: number): string {
+  const base = 10n ** BigInt(decimals);
+  const whole = amount / base;
+  const frac = (amount % base).toString().padStart(decimals, "0").replace(/0+$/, "");
   return frac ? `${whole}.${frac}` : `${whole}`;
 }
 
@@ -131,9 +159,11 @@ function errorResult(msg: string): ActionResult {
   return { status: "error", title: "Action failed", note: msg };
 }
 
-// Tabs - one STRK20 action each (Umbra-style single-action interface).
-type TabKey = "shield" | "send" | "unshield" | "echo" | "balances";
+// Tabs - one STRK20 action each (Umbra-style single-action interface), plus
+// Trade (private swap via AVNU) which gets its own custom render block below.
+type TabKey = "trade" | "shield" | "send" | "unshield" | "echo" | "balances";
 const TABS: { key: TabKey; label: string }[] = [
+  { key: "trade", label: "Trade" },
   { key: "shield", label: "Shield" },
   { key: "send", label: "Send" },
   { key: "unshield", label: "Unshield" },
@@ -176,7 +206,143 @@ export default function WalletAccountV6Tag() {
   const [resultDeploy, setResultDeploy] = useState<ActionResult | null>(null);
   const [deploying, setDeploying] = useState<boolean>(false);
   // Active action tab (Umbra-style single-action interface).
-  const [tab, setTab] = useState<TabKey>("shield");
+  const [tab, setTab] = useState<TabKey>("trade");
+
+  // --- Trade (private swap via AVNU) ------------------------------------
+  const avnuConfig = AVNU_CONFIG[myFrontendProviderIndex];
+  const [tradeTokens, setTradeTokens] = useState<Token[]>([]);
+  const [tradeTokensError, setTradeTokensError] = useState<string>("");
+  const [buyTokenAddress, setBuyTokenAddress] = useState<string>("");
+  const [sellAmountStr, setSellAmountStr] = useState<string>("1");
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState<string>("");
+  const [swapping, setSwapping] = useState(false);
+  const [resultTrade, setResultTrade] = useState<ActionResult | null>(null);
+
+  // Real token list from AVNU's own API for the current network — no
+  // hardcoded/guessed addresses. Verified tokens only, STRK excluded (it's
+  // always the sell side here since it's what the pool actually shields).
+  useEffect(() => {
+    if (!avnuConfig) return;
+    let cancelled = false;
+    setTradeTokensError("");
+    fetchTokens({ tags: ["Verified"], size: 30 }, { baseUrl: avnuConfig.baseUrl })
+      .then((page) => {
+        if (cancelled) return;
+        const strkHex = num.toHex(TOKEN);
+        const list = page.content.filter((t) => {
+          try {
+            return num.toHex(t.address) !== strkHex;
+          } catch {
+            return true;
+          }
+        });
+        setTradeTokens(list);
+        setBuyTokenAddress((prev) => prev || list[0]?.address || "");
+      })
+      .catch((err: any) => {
+        if (!cancelled) setTradeTokensError(err?.message ?? String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [avnuConfig, myFrontendProviderIndex]);
+
+  const buyToken = tradeTokens.find((t) => t.address === buyTokenAddress) ?? null;
+
+  function parseAmountToUnits(amountStr: string, decimals: number): bigint | null {
+    const trimmed = amountStr.trim();
+    if (!trimmed || !/^\d*\.?\d*$/.test(trimmed)) return null;
+    const [whole, frac = ""] = trimmed.split(".");
+    if (!whole && !frac) return null;
+    const fracPadded = frac.padEnd(decimals, "0").slice(0, decimals);
+    try {
+      return BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt(fracPadded || "0");
+    } catch {
+      return null;
+    }
+  }
+
+  const handleGetQuote = async () => {
+    setQuote(null);
+    setQuoteError("");
+    setResultTrade(null);
+    if (!connectedAddress) {
+      setQuoteError("Connect a wallet first.");
+      return;
+    }
+    if (!buyToken) {
+      setQuoteError("No tradeable token selected.");
+      return;
+    }
+    const sellAmount = parseAmountToUnits(sellAmountStr, 18); // STRK, 18 decimals
+    if (!sellAmount || sellAmount <= 0n) {
+      setQuoteError("Enter an amount to sell.");
+      return;
+    }
+    setQuoting(true);
+    try {
+      const quotes = await getQuotes(
+        {
+          sellTokenAddress: TOKEN,
+          buyTokenAddress: buyToken.address,
+          sellAmount,
+          takerAddress: connectedAddress,
+        },
+        { baseUrl: avnuConfig.baseUrl }
+      );
+      if (!quotes.length) {
+        setQuoteError("No route found for this pair/amount.");
+        return;
+      }
+      setQuote(quotes[0]);
+    } catch (err: any) {
+      setQuoteError(err?.message ?? String(err));
+    } finally {
+      setQuoting(false);
+    }
+  };
+
+  const handleSwap = async () => {
+    if (!quote || !myWalletAccount || !connectedAddress || !buyToken) return;
+    setSwapping(true);
+    setResultTrade({ status: "pending", title: "Building the private swap…" });
+    try {
+      // WalletAccountV6.strk20PrepareInvoke structurally satisfies AVNU's
+      // Strk20ProverAccount — the wallet is the prover, no backend needed.
+      const prover = createStrk20WalletProver(myWalletAccount as unknown as Parameters<typeof createStrk20WalletProver>[0]);
+      const result = await executePrivateSwap(
+        {
+          quote,
+          slippage: 0.005,
+          takerAddress: connectedAddress,
+          poolAddress: avnuConfig.poolAddress,
+          feeMode: { poolFeeToken: TOKEN },
+          prover,
+        },
+        { baseUrl: avnuConfig.baseUrl, paymasterBaseUrl: avnuConfig.paymasterBaseUrl }
+      );
+      const txH = result.transactionHash;
+      const amountLabel = `${sellAmountStr} STRK → ${buyToken.symbol}`;
+      setResultTrade({
+        status: "pending",
+        title: "Waiting for confirmation…",
+        rows: [
+          { label: "Amount", value: amountLabel },
+          { label: "Transaction", value: shortHex(txH), hash: txH },
+        ],
+      });
+      const provider = constants.myFrontendProviders[myFrontendProviderIndex];
+      const txR = await provider.waitForTransaction(txH, { retries: 400, retryInterval: 3000 });
+      setResultTrade(receiptToResult(txR, txH, amountLabel));
+      setQuote(null);
+    } catch (err: any) {
+      setResultTrade(errorResult(err?.message ?? err?.toString?.() ?? String(err)));
+    } finally {
+      setSwapping(false);
+    }
+  };
 
   const getWAchainId = () => {
     myWalletAccount?.provider
@@ -485,7 +651,7 @@ export default function WalletAccountV6Tag() {
   // Per-tab content: label, the fixed amount + token, a one-line hint, the CTA
   // label, its handler, and the structured result.
   const CONFIG: Record<
-    TabKey,
+    Exclude<TabKey, "trade">,
     { label: string; value: string; token: string; hint: string; cta: string; onRun: () => void; result: ActionResult | null; disabled: boolean }
   > = {
     shield: { label: "You're shielding", value: "10", token: "STRK", hint: "Deposit into the privacy pool", cta: "Shield", onRun: handleShield, result: resultShield, disabled: !isStrk20Network },
@@ -494,7 +660,7 @@ export default function WalletAccountV6Tag() {
     echo: { label: "Echo invoke round-trip", value: "5", token: "STRK", hint: "Withdraw → helper → refill open note", cta: "Run echo", onRun: handleComplex, result: resultComplex, disabled: !isStrk20Network || !hasEchoHelper },
     balances: { label: "Shielded balances", value: "All", token: "tokens", hint: "Read your private pool balances", cta: "Query balances", onRun: handleBalances, result: resultBalances, disabled: !isStrk20Network },
   };
-  const active = CONFIG[tab];
+  const active = tab === "trade" ? null : CONFIG[tab];
 
   return (
     <div className={styles.panel}>
@@ -511,23 +677,87 @@ export default function WalletAccountV6Tag() {
         ))}
       </div>
 
+      {/* Trade: token pair + amount, quote before swap (private via AVNU) */}
+      {tab === "trade" && (
+        <>
+          <div className={styles.inputBlock}>
+            <div className={styles.inputLabel}>You&apos;re selling</div>
+            <div className={styles.inputMain}>
+              <input
+                className={styles.tradeAmountInput}
+                value={sellAmountStr}
+                onChange={(e) => {
+                  setSellAmountStr(e.target.value);
+                  setQuote(null);
+                }}
+                inputMode="decimal"
+                placeholder="0"
+                aria-label="Amount to sell"
+              />
+              <span className={styles.tokenPill}>
+                <span className={styles.tokenDot}>
+                  <StrkCoin size={22} />
+                </span>
+                STRK
+              </span>
+            </div>
+            <div className={styles.subLine}>
+              <span>From your shielded balance</span>
+              <span className={styles.subMono}>{shortWallet}</span>
+            </div>
+          </div>
+
+          <div className={styles.inputBlock} style={{ marginTop: 10 }}>
+            <div className={styles.inputLabel}>You&apos;re buying</div>
+            <div className={styles.inputMain}>
+              <div className={styles.bigValue}>
+                {quote ? fmtUnits(quote.buyAmount, buyToken?.decimals ?? 18) : "—"}
+              </div>
+              <select
+                className={styles.tokenSelect}
+                value={buyTokenAddress}
+                onChange={(e) => {
+                  setBuyTokenAddress(e.target.value);
+                  setQuote(null);
+                }}
+                disabled={!tradeTokens.length}
+                aria-label="Token to buy"
+              >
+                {tradeTokens.length === 0 && <option value="">Loading tokens…</option>}
+                {tradeTokens.map((t) => (
+                  <option key={t.address} value={t.address}>{t.symbol}</option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.subLine}>
+              <span>{quote ? `Price impact ${(quote.priceImpact * 100).toFixed(2)}%` : "Private swap via AVNU — amounts hidden inside the pool"}</span>
+            </div>
+          </div>
+
+          {tradeTokensError && <div className={styles.warn}>Couldn&apos;t load tokens: {tradeTokensError}</div>}
+          {quoteError && <div className={styles.warn}>{quoteError}</div>}
+        </>
+      )}
+
       {/* Active-action input block */}
-      <div className={styles.inputBlock}>
-        <div className={styles.inputLabel}>{active.label}</div>
-        <div className={styles.inputMain}>
-          <div className={styles.bigValue}>{active.value}</div>
-          <span className={styles.tokenPill}>
-            <span className={styles.tokenDot}>
-              <StrkCoin size={22} />
+      {active && (
+        <div className={styles.inputBlock}>
+          <div className={styles.inputLabel}>{active.label}</div>
+          <div className={styles.inputMain}>
+            <div className={styles.bigValue}>{active.value}</div>
+            <span className={styles.tokenPill}>
+              <span className={styles.tokenDot}>
+                <StrkCoin size={22} />
+              </span>
+              {active.token}
             </span>
-            {active.token}
-          </span>
+          </div>
+          <div className={styles.subLine}>
+            <span>{active.hint}</span>
+            <span className={styles.subMono}>{shortWallet}</span>
+          </div>
         </div>
-        <div className={styles.subLine}>
-          <span>{active.hint}</span>
-          <span className={styles.subMono}>{shortWallet}</span>
-        </div>
-      </div>
+      )}
 
       {/* Info / network row */}
       <div className={styles.feeRow}>
@@ -564,9 +794,21 @@ export default function WalletAccountV6Tag() {
 
       {/* Primary CTA - connect prompt until a wallet is connected. */}
       {isConnected ? (
-        <button className={styles.btnCta} disabled={active.disabled} onClick={active.onRun}>
-          {active.cta}
-        </button>
+        tab === "trade" ? (
+          quote ? (
+            <button className={styles.btnCta} disabled={swapping} onClick={handleSwap}>
+              {swapping ? "Swapping…" : "Swap privately"}
+            </button>
+          ) : (
+            <button className={styles.btnCta} disabled={quoting || !isStrk20Network || !buyToken} onClick={handleGetQuote}>
+              {quoting ? "Getting quote…" : "Get quote"}
+            </button>
+          )
+        ) : active ? (
+          <button className={styles.btnCta} disabled={active.disabled} onClick={active.onRun}>
+            {active.cta}
+          </button>
+        ) : null
       ) : (
         <SelectWallet variant="ctaBig" />
       )}
@@ -593,7 +835,7 @@ export default function WalletAccountV6Tag() {
       )}
 
       {/* Inline result */}
-      {active.result ? <ResultCard r={active.result} /> : null}
+      {tab === "trade" ? (resultTrade ? <ResultCard r={resultTrade} /> : null) : active?.result ? <ResultCard r={active.result} /> : null}
     </div>
   );
 }
