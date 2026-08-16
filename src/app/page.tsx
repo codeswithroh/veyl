@@ -134,6 +134,7 @@ export default function Page() {
 
   return (
     <div className={styles.page} ref={root}>
+      <div className={styles.ambientGlow} aria-hidden="true" />
       <header className={styles.nav}>
         <div className={styles.navInner}>
           <a href="#top" className={styles.wordmark}>VEYL</a>
@@ -307,16 +308,6 @@ export default function Page() {
                 <p>{body}</p>
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* --- Beat 4: App teaser -> dashboard ----------------------------------- */}
-        <section id="app" className={styles.appSection}>
-          <div className={`${styles.teaserCard} js-scroll-fade`}>
-            <span className={styles.eyebrow}>Try it live</span>
-            <h2 className={styles.h2}>Wired to the real STRK20 mainnet pool.</h2>
-            <p>Connect a wallet to shield, unshield, and privately transfer — you&apos;ll land straight in the dashboard.</p>
-            <Link href="/dashboard" className={styles.btnGhost}>Open dashboard →</Link>
           </div>
         </section>
 

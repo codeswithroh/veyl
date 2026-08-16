@@ -7,6 +7,21 @@
   overflow-x: hidden;
 }
 
+/* Ambient glow: continues the hero video's ember mood down the rest of the
+   page instead of cutting hard to flat black. Fixed (no repaint on scroll),
+   very low opacity — a warmth, not a shape. The hero's own opaque video
+   covers this same layer while it's in view, so there's no double-up there. */
+.ambientGlow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 700px at 12% 15%, rgba(255, 90, 46, 0.07), transparent 60%),
+    radial-gradient(1000px 800px at 88% 45%, rgba(178, 58, 23, 0.06), transparent 60%),
+    radial-gradient(800px 700px at 20% 90%, rgba(255, 90, 46, 0.05), transparent 60%);
+}
+
 .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
 /* --- Nav: fixed, translucent, floats over the hero video ------------------ */
@@ -224,18 +239,6 @@
 .whyIconBadge svg path { fill: var(--on-primary) !important; }
 .whyCard h3 { font-size: 1.02rem; color: var(--text); margin-bottom: 8px; }
 .whyCard p { font-size: 0.88rem; color: var(--muted); line-height: 1.5; }
-
-/* app embed */
-.appSection { position: relative; padding: 96px 24px 64px; max-width: 1200px; margin: 0 auto; }
-.teaserCard {
-  max-width: 640px; margin: 0 auto; text-align: center;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 24px;
-  padding: 56px 32px;
-}
-.teaserCard .eyebrow { margin-bottom: 16px; }
-.teaserCard .h2 { margin-bottom: 12px; }
-.teaserCard p { font-size: 0.95rem; color: var(--muted); margin-bottom: 28px; }
-.teaserCard .btnGhost { display: inline-flex; }
 
 /* --- FAQ ------------------------------------------------------------------ */
 .faqList { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
