@@ -57,15 +57,26 @@ function getPrivateTransfers() {
     signer: SERVICE_ACCOUNT_PRIVATE_KEY!,
   });
 
+  // No shared public prover/discovery service exists for STRK20 — every integrator
+  // self-hosts the Transaction Prover and Discovery Service (Docker images in the
+  // Privacy SDK monorepo's README, table "Components"). VEYL_PROVING_SERVICE_URL /
+  // VEYL_DISCOVERY_SERVICE_URL must point at Veyl's own deployment of those; there
+  // is no working default to fall back to.
+  if (!process.env.VEYL_PROVING_SERVICE_URL || !process.env.VEYL_DISCOVERY_SERVICE_URL) {
+    throw new Error(
+      "VEYL_PROVING_SERVICE_URL and VEYL_DISCOVERY_SERVICE_URL must be set — see server/README.md."
+    );
+  }
+
   return createPrivateTransfers({
     account,
     viewingKeyProvider: { getViewingKey: async () => VIEWING_KEY! },
     provingProvider: {
-      url: process.env.VEYL_PROVING_SERVICE_URL ?? "https://prover.strk20.starknet.io",
+      url: process.env.VEYL_PROVING_SERVICE_URL,
       chainId: CHAIN_ID,
     },
     discoveryProvider: {
-      url: process.env.VEYL_DISCOVERY_SERVICE_URL ?? "https://indexer.strk20.starknet.io",
+      url: process.env.VEYL_DISCOVERY_SERVICE_URL,
     },
     poolContractAddress: POOL_CONTRACT_ADDRESS,
     shadowAccountAnonymizerAddress: SHADOW_ACCOUNT_ANONYMIZER_ADDRESS!,

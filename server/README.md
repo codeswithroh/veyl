@@ -36,12 +36,22 @@ Scarb 2.17.0/release profile) using the developer-approved Sepolia deployer key.
   account for the testnet phase — split this before mainnet), and `ALCHEMY_KEY`
   filled in.
 
-**Not yet callable for a real trade** — one thing left:
+**Not yet callable for a real trade** — blocked on self-hosted infra:
 
-- **No viewing key registered yet.** `VEYL_BACKEND_VIEWING_KEY` is still empty,
-  so `/health` reports `configured: false` and `/shadow-account/trade` still
-  503s (correctly — the guardrail is working). Registering a viewing key and
-  round-tripping a real shadow-account trade on Sepolia is the next step.
+- A viewing key is generated and set (`VEYL_BACKEND_VIEWING_KEY`) and `/health`
+  reports `configured: true`.
+- **There is no shared public STRK20 prover or discovery service.** Every
+  integrator self-hosts the Transaction Prover and Discovery Service — Docker
+  images listed in the [Privacy SDK monorepo README](https://github.com/starkware-libs/starknet-privacy#components)
+  (`ghcr.io/starkware-libs/starknet-privacy/transaction-prover`,
+  `.../discovery-service`), wired to a Starknet node (e.g. Pathfinder). An
+  earlier pass at this file guessed at hosted URLs
+  (`prover.strk20.starknet.io`, `indexer.strk20.starknet.io`) — those don't
+  resolve and were removed; `getPrivateTransfers()` now throws clearly if
+  `VEYL_PROVING_SERVICE_URL` / `VEYL_DISCOVERY_SERVICE_URL` aren't set, instead
+  of silently pointing at a dead host.
+- Standing up that infra (and then round-tripping a real Sepolia trade) is
+  deferred — tracked as its own step, not blocking the rest of Phase 2/3.
 
 ## Run it
 

@@ -60,10 +60,9 @@ Everything in this phase stays on what's already built — no backend yet.
 3. `ShadowAccountAnonymizer` instance deployed at `0x2067df54869f30bd1052e334a91320b89da441f4b448042b4405724bd4cbf53` (tx `0x29b19a5dfdd30b3c1a8349a4bc5ffd8bfda434f875a73c71aa6e3b8a724926b`), constructor: `privacy_contract` = Sepolia STRK20 pool, `shadow_account_class_hash` = the `SubAccount` class above, `governance_admin` = the deployer account.
 4. `server/.env.local` filled in: `SHADOW_ACCOUNT_ANONYMIZER_ADDRESS`, `VEYL_SERVICE_ACCOUNT_ADDRESS`/`_PRIVATE_KEY` (reusing the deployer account for the testnet phase — split from a dedicated service key before mainnet), `ALCHEMY_KEY`.
 
-**Remaining:**
-1. Register a viewing key for `VEYL_BACKEND_VIEWING_KEY` — `/health` currently reports `configured: false` without it.
-2. Round-trip a real shadow-account trade on Sepolia end to end.
-3. Once that succeeds, repeat the deployment on mainnet — separately, explicitly, not automatically.
+**Done 2026-08-17:** viewing key generated and set (`VEYL_BACKEND_VIEWING_KEY`); `/health` reports `configured: true`.
+
+**⛔ blocked 2026-08-17: no shared public STRK20 prover/discovery service.** Every integrator self-hosts the Transaction Prover and Discovery Service (Docker images in the [Privacy SDK monorepo](https://github.com/starkware-libs/starknet-privacy#components)) wired to a Starknet node. The server previously guessed at hosted URLs (`prover.strk20.starknet.io`, `indexer.strk20.starknet.io`) — those don't resolve; fixed to throw clearly instead of silently failing. Standing up that infra and completing a real Sepolia trade round-trip is deferred, at the developer's call — tracked separately, not blocking Phase 3.
 
 This is new infrastructure, not a frontend change. **Two things gate this phase before code runs against anything real:**
 
