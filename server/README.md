@@ -14,19 +14,34 @@ Installs, type-checks, builds, and boots — verified for real (`npm install`,
 `npm run typecheck`, `npm run build`, and a live boot confirming `/health` and
 the unconfigured-state guardrail on `/shadow-account/trade` all pass).
 
-**Not yet callable for a real trade** — one thing left, and it needs you:
+**`ShadowAccountAnonymizer` deployed to Sepolia — 2026-08-17.** Built from the
+first-party Starkware reference contract (`packages/shadow_account_anonymizer`
+in the [Privacy SDK monorepo](https://github.com/starkware-libs/starknet-privacy),
+Scarb 2.17.0/release profile) using the developer-approved Sepolia deployer key.
 
-- **No `ShadowAccountAnonymizer` instance deployed yet.** `shadowAccounts(dappName)`
-  throws without `SHADOW_ACCOUNT_ANONYMIZER_ADDRESS` configured. It's a
-  first-party Starkware reference contract
-  (`packages/shadow_account_anonymizer` in the
-  [Privacy SDK monorepo](https://github.com/starkware-libs/starknet-privacy)),
-  not something Veyl writes from scratch — but deploying an instance is a real
-  onchain action and needs an explicit go, deployed to **Sepolia first**, per
-  the testnet-before-mainnet rule.
-- You'll also need a funded Sepolia account for `VEYL_SERVICE_ACCOUNT_ADDRESS`
-  / `VEYL_SERVICE_ACCOUNT_PRIVATE_KEY`, and a registered viewing key for
-  `VEYL_BACKEND_VIEWING_KEY`.
+- `SubAccount` class (from `starkware_accounts`, same monorepo dependency)
+  declared: class hash `0x3270d93eebb772b508b5ea850b66f45a4bb42ed6f4180ee3cefb8b1f182db2a`,
+  tx [`0x11d8c8932f414f63e45f14638f56efebead29c3c7ca93523199955ff2d7dc6a`](https://sepolia.voyager.online/tx/0x11d8c8932f414f63e45f14638f56efebead29c3c7ca93523199955ff2d7dc6a).
+- `ShadowAccountAnonymizer` class was already declared on Sepolia (class hash
+  `0x07ffaf4f427c8de0ca35d32d44d97a31da3c24641e32b72f340660d5b9e7f5e6`, identical
+  bytecode declared by a prior integrator) — no new declare needed.
+- Instance deployed at `0x2067df54869f30bd1052e334a91320b89da441f4b448042b4405724bd4cbf53`,
+  tx [`0x29b19a5dfdd30b3c1a8349a4bc5ffd8bfda434f875a73c71aa6e3b8a724926b`](https://sepolia.voyager.online/tx/0x29b19a5dfdd30b3c1a8349a4bc5ffd8bfda434f875a73c71aa6e3b8a724926b),
+  constructor args: `privacy_contract` = Sepolia STRK20 pool
+  (`0x254a6b2997ef52e9f830ce1f543f6b29768295e8d17e2267d672c552cfe0d91`),
+  `shadow_account_class_hash` = the `SubAccount` class above, `governance_admin`
+  = the deployer account.
+- `server/.env.local` now has `SHADOW_ACCOUNT_ANONYMIZER_ADDRESS`,
+  `VEYL_SERVICE_ACCOUNT_ADDRESS`/`_PRIVATE_KEY` (reusing the funded deployer
+  account for the testnet phase — split this before mainnet), and `ALCHEMY_KEY`
+  filled in.
+
+**Not yet callable for a real trade** — one thing left:
+
+- **No viewing key registered yet.** `VEYL_BACKEND_VIEWING_KEY` is still empty,
+  so `/health` reports `configured: false` and `/shadow-account/trade` still
+  503s (correctly — the guardrail is working). Registering a viewing key and
+  round-tripping a real shadow-account trade on Sepolia is the next step.
 
 ## Run it
 

@@ -50,15 +50,20 @@ Everything in this phase stays on what's already built — no backend yet.
 4. Confirm graceful degradation: detect wallets without STRK20 support via a version query (`supportedWalletApi`/`supportedSpecs`), **never** by probing balances — that triggers a consent prompt for data the app doesn't need yet.
 5. Verify against the Ready extension + https://starknet-wallet-account.vercel.app/
 
-## 6. Phase 2 🟡 in progress 2026-08-15 — shadow-accounts backend (goal #1: unlinkable execution wallets)
+## 6. Phase 2 🟡 in progress 2026-08-17 — shadow-accounts backend (goal #1: unlinkable execution wallets)
 
 **Done and verified for real:** GitHub Packages auth cleared (gh token scope upgraded to `read:packages`); `server/` installs, type-checks (`tsc --noEmit` clean against the real installed SDK types — not guessed), builds, and boots; `/health` and the unconfigured-state 503 guardrail on `/shadow-account/trade` both confirmed live. Defaults to **Sepolia** (`VEYL_NETWORK=sepolia`), per the testnet-before-mainnet rule — mainnet is an explicit opt-in via env var, not the default.
 
-**Remaining, blocked on you:**
-1. Deploy a `ShadowAccountAnonymizer` instance to **Sepolia first** (first-party Starkware reference contract, not something Veyl writes — but still a real onchain deployment needing your explicit go).
-2. Fund a Sepolia service account for `VEYL_SERVICE_ACCOUNT_ADDRESS` / `VEYL_SERVICE_ACCOUNT_PRIVATE_KEY`.
-3. Register a viewing key for `VEYL_BACKEND_VIEWING_KEY`.
-4. Once a real Sepolia trade round-trips successfully, repeat the deployment on mainnet — separately, explicitly, not automatically.
+**Deployed to Sepolia 2026-08-17, with your explicit go-ahead** (deployer key you provided, account `0x06cf9f83689b0397ca7a59d513ceeb81c397e2882728af8fa1d5f174e5358db7`, ~99.9 STRK funded):
+1. `SubAccount` class declared — `0x3270d93eebb772b508b5ea850b66f45a4bb42ed6f4180ee3cefb8b1f182db2a` (tx `0x11d8c8932f414f63e45f14638f56efebead29c3c7ca93523199955ff2d7dc6a`).
+2. `ShadowAccountAnonymizer` class was already declared on Sepolia by a prior integrator (identical bytecode, class hash `0x07ffaf4f427c8de0ca35d32d44d97a31da3c24641e32b72f340660d5b9e7f5e6`) — reused, no redundant declare.
+3. `ShadowAccountAnonymizer` instance deployed at `0x2067df54869f30bd1052e334a91320b89da441f4b448042b4405724bd4cbf53` (tx `0x29b19a5dfdd30b3c1a8349a4bc5ffd8bfda434f875a73c71aa6e3b8a724926b`), constructor: `privacy_contract` = Sepolia STRK20 pool, `shadow_account_class_hash` = the `SubAccount` class above, `governance_admin` = the deployer account.
+4. `server/.env.local` filled in: `SHADOW_ACCOUNT_ANONYMIZER_ADDRESS`, `VEYL_SERVICE_ACCOUNT_ADDRESS`/`_PRIVATE_KEY` (reusing the deployer account for the testnet phase — split from a dedicated service key before mainnet), `ALCHEMY_KEY`.
+
+**Remaining:**
+1. Register a viewing key for `VEYL_BACKEND_VIEWING_KEY` — `/health` currently reports `configured: false` without it.
+2. Round-trip a real shadow-account trade on Sepolia end to end.
+3. Once that succeeds, repeat the deployment on mainnet — separately, explicitly, not automatically.
 
 This is new infrastructure, not a frontend change. **Two things gate this phase before code runs against anything real:**
 
