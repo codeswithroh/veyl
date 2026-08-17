@@ -78,12 +78,20 @@ Steps:
 5. **Stop before deployment or any mainnet call** — hand off to you for the go/no-go on deploying the `ShadowAccountAnonymizer` instance and funding it.
 6. Manual verification (post-deploy): confirm a shadow-account trade's funding wallet is genuinely unlinkable to an outside observer of the pool, while confirming (internally) the backend's own mapping is correct.
 
-## 7. Phase 3 — fair-launch anonymizer contract (goal #2, tracked)
+## 7. Phase 3 🟡 in progress 2026-08-17 — fair-launch anonymizer contract (goal #2)
 
-- Entry criterion: Phase 1 + 2 shipped and manually verified.
-- Design now: adapt the shape of `packages/ekubo_swap_anonymizer` / `packages/vesu_lending_anonymizer` (reference skeletons in the SDK monorepo, not drop-in) into a sealed-bid settlement helper — escrow via open notes, reveal via viewing key, settle via `InvokeExternal`. This is Veyl's own Cairo contract; this skill does not write it.
-- **Audit step — non-negotiable before mainnet:** this contract moves real funds; review/audit is Veyl's own responsibility before any real launch round runs against it.
-- Replace `cairo/src/lib.cairo`'s echo demo entirely rather than extending it — the echo helper is explicitly a round-trip no-op, not a starting point for settlement logic.
+**Design done, contract written and unit-tested — `cairo/src/lib.cairo` now has `FairLaunchAnonymizer`.** Adapts the `privacy_invoke(...) -> Span<OpenNoteDeposit>` shape from `packages/ekubo_swap_anonymizer` / `packages/vesu_lending_anonymizer` (reference skeletons in the SDK monorepo — read, not copied) into a fixed-price, fixed-ticket, sealed-bid, pro-rata launch.
+
+**One deliberate deviation from this plan's original wording, documented for honesty (§"accuracy rules"):** "reveal via viewing key" turned out not to be the right mechanism. The privacy pool hides *who* is interacting, not *how much* a single deposit moves — transfer amounts are public regardless of shielding. A variable-amount bid would leak bid size at commit time no matter how it's escrowed. The contract instead makes every bidder escrow an identical fixed `ticket_size` (so no amount ever leaks) and uses a plain hash commit/reveal (`poseidon_hash_span([salt])`) to seal *participation*, which is the part STRK20 can actually hide. Full design rationale in [`cairo/README.md`](cairo/README.md).
+
+- `commit` / `claim` go through `privacy_invoke` (open-note escrow in, open-note settlement out — token + STRK refund, both back to the same shielded `note_id`); `reveal` / `finalize` never move funds so they stay plain entrypoints and don't need pool involvement.
+- Pull-based claim, not batch settlement — no on-chain sorting or unbounded loop, so gas doesn't scale with bidder count.
+- `snforge` unit tests written and passing: full-fill value conservation, and a forfeited (never-revealed) bid correctly stays escrowed and unclaimable — both explicit plan §8 requirements.
+- Replaces `cairo/src/lib.cairo`'s echo demo entirely, as planned — the echo helper's old address stays recorded in `cairo/address.md` for history.
+
+**Audit step — still non-negotiable before mainnet, unchanged from this plan's original wording.** This is a first draft for testnet iteration (see `cairo/README.md`'s ⚠️ UNAUDITED note); review/audit remains Veyl's own responsibility before any real launch round runs against it.
+
+**Remaining:** deploy to Sepolia and run a real test round (needs its own explicit go-ahead — separate step, tracked in the task list).
 
 ## 8. Testing
 
