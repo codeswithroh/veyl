@@ -54,10 +54,41 @@ scarb build
 Artifacts land in `target/dev/` — `strk20_invoke_helper_FairLaunchAnonymizer.contract_class.json`
 (Sierra) and the matching `.compiled_contract_class.json` (CASM).
 
+## Tests
+
+`snforge` unit tests cover full-fill value conservation and a forfeited (never-revealed) bid
+correctly staying escrowed and unclaimable — plan §8's two explicit requirements. Run:
+
+```bash
+scarb build && snforge test
+```
+
+## Deployed — Sepolia, 2026-08-18
+
+Declared and deployed for real; addresses in [`address.md`](address.md). Constructor wired to the
+**real Sepolia STRK20 pool** as `pool_address`, so `privacy_invoke` only accepts calls from that
+pool — same as it would in production.
+
+**What's verified:** the contract is live on-chain, and `create_round` (admin-only, moves no
+funds) was called for real and read back correctly via `get_round`.
+
+**What isn't yet verified:** a full `commit → reveal → finalize → claim` round through the *real*
+privacy pool. `commit`/`claim` only accept calls from `pool_address`, and reaching that path for
+real requires the same self-hosted Transaction Prover + Discovery Service infra that
+[server/README.md](../server/README.md)'s Phase 2 verification is blocked on (no shared public
+STRK20 prover/discovery service exists — every integrator self-hosts). Until that infra exists,
+the commit/reveal/finalize/claim *logic* is verified by the `snforge` unit tests above (which
+exercise the exact same code paths against a mock pool caller), not by a live pool-mediated round.
+
+## Oversubscription pro-rata math — not yet covered by a test
+
+The `snforge` suite above covers full-fill and forfeiture; an oversubscribed round (multiple
+revealed tickets exceeding `total_supply * price`, exercising the `clearing_num`/`clearing_den`
+branch in `finalize`) doesn't have a test yet. Worth adding before a real launch round.
+
 ## Not yet done
 
-- `snforge` tests (balance-sheet-nets-to-zero, forfeited-reveal, oversubscription pro-rata math,
-  double-claim/double-reveal reverts) — plan §8 requirement, not yet written.
-- Deployment (Sepolia first, then mainnet only after a verified test round) — separate step,
-  needs its own explicit go-ahead.
+- Oversubscription pro-rata test (see above).
 - A real audit before any mainnet round.
+- Mainnet deployment — separate step, needs its own explicit go-ahead, only after a real
+  pool-mediated Sepolia round has actually settled.

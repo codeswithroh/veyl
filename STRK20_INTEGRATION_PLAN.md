@@ -91,7 +91,9 @@ Steps:
 
 **Audit step — still non-negotiable before mainnet, unchanged from this plan's original wording.** This is a first draft for testnet iteration (see `cairo/README.md`'s ⚠️ UNAUDITED note); review/audit remains Veyl's own responsibility before any real launch round runs against it.
 
-**Remaining:** deploy to Sepolia and run a real test round (needs its own explicit go-ahead — separate step, tracked in the task list).
+**Deployed to Sepolia 2026-08-18, with your explicit go-ahead.** Declared class `0x2a96673fb3019abe033aa8cbf6cbf47ceffca0e2e41c196704c21b1da2b3769`, instance `0x6839e11d1fae2b1b6981900c301a1a4b5f164412b696faa731b98d72a859436` (full addresses in `cairo/address.md`), constructor wired to the **real** Sepolia STRK20 pool as `pool_address` — production-correct, not a stub. Ran `create_round` for real on-chain (round_id 0, no funds moved) and read it back correctly.
+
+**A full pool-mediated `commit → reveal → finalize → claim` round is not yet verified** — `commit`/`claim` only accept calls from `pool_address` (the real pool), and reaching that requires the same self-hosted Transaction Prover + Discovery Service infra that Phase 2's end-to-end verification is blocked on (§6). The commit/claim/finalize *logic itself* is verified by the `snforge` unit tests in `cairo/src/tests.cairo` (full-fill value conservation, forfeited-bid-stays-escrowed) — exercising the identical code paths against a mock pool caller. Live pool-mediated verification is deferred alongside Phase 2's, for the same reason.
 
 ## 8. Testing
 
