@@ -28,22 +28,39 @@ is the part STRK20 can genuinely hide.
    mint or source the sale token itself.
 2. **`commit`** (via `privacy_invoke`, before `commit_end`) — the pool has already sent one
    `ticket_size` of STRK to the anonymizer; this call records `commitment = hash(salt)` against
-   the caller's `note_id`. Reverts if the just-received delta isn't exactly `ticket_size`.
+   `bid_id`. Reverts if the just-received delta isn't exactly `ticket_size`.
 3. **`reveal`** (plain call, before `reveal_end`) — proves `hash(salt) == commitment` for a
-   `note_id` and counts it. Callable by anyone relaying on the bidder's behalf; the caller's own
+   `bid_id` and counts it. Callable by anyone relaying on the bidder's behalf; the caller's own
    address is never checked against the bidder, so submitting a reveal doesn't re-link identity
    to the original commit.
 4. **`finalize`** (permissionless, once `reveal_end` has passed) — computes the uniform clearing
    ratio from however many tickets were actually revealed: full fill if the round wasn't
    oversubscribed, pro-rata (`raise_cap / total_raised`) if it was.
 5. **`claim`** (via `privacy_invoke`, after `finalize`) — pays out `tokens_out` of `launch_token`
-   and any unused STRK as a refund, both back into the same shielded `note_id`. Pull-based by
-   design — no on-chain sorting or batch settlement loop, so gas doesn't scale with bidder count
-   at settlement time.
+   and any unused STRK as a refund, into this transaction's own two freshly-created open notes.
+   Pull-based by design — no on-chain sorting or batch settlement loop, so gas doesn't scale with
+   bidder count at settlement time.
 
 Non-revealed commitments simply forfeit their ticket (never counted in `total_raised`, and
 `claim` requires `is_revealed`) — the STRK stays escrowed in the contract, matching the plan's
 explicit test requirement ("a failed reveal correctly forfeits the bid").
+
+### `bid_id` vs. open note ids — don't conflate them
+
+Two different id spaces, easy to mix up when wiring the wallet calldata (an earlier draft of this
+contract did exactly that — see [`address.md`](address.md)'s superseded entry):
+
+- **`bid_id`** — a felt252 the caller picks, stable across the *separate* commit/reveal/claim
+  transactions (potentially days apart). It's how this contract looks up a bidder's state; it has
+  no on-chain meaning outside this contract's own storage.
+- **Open note ids** (`${openNoteIds[N]}` in Wallet API calldata) — minted fresh by the pool
+  *within a single atomic transaction*, and only meaningful there. `claim`'s `Claim` variant takes
+  two of these explicitly (`token_note_id`, `strk_note_id`) for that transaction's two
+  pre-created open notes — never `bid_id`.
+
+`claim` always returns exactly two `OpenNoteDeposit` entries (one per pre-created open note),
+using `0` for whichever side has nothing to pay, so the returned array always matches what the
+caller set up upfront.
 
 ## Build
 
@@ -63,7 +80,7 @@ correctly staying escrowed and unclaimable — plan §8's two explicit requireme
 scarb build && snforge test
 ```
 
-## Deployed — Sepolia, 2026-08-18
+## Deployed — Sepolia, 2026-08-18 (redeployed same day after the `bid_id` fix)
 
 Declared and deployed for real; addresses in [`address.md`](address.md). Constructor wired to the
 **real Sepolia STRK20 pool** as `pool_address`, so `privacy_invoke` only accepts calls from that

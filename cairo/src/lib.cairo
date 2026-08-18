@@ -17,6 +17,14 @@
 //! escrow in, open-note settlement out); `reveal` and `finalize` never move funds, so they
 //! stay plain entrypoints.
 //!
+//! `bid_id` vs. open note ids — two different id spaces, don't conflate them: `bid_id` is
+//! a caller-chosen felt252 that stays stable across the *separate* commit/reveal/claim
+//! transactions (potentially days apart) so this contract can look up a bidder's state.
+//! The Wallet API's own open-note ids (`${openNoteIds[N]}`) are minted fresh *within* a
+//! single atomic transaction and only make sense there — `claim` takes them as explicit
+//! parameters (`token_note_id`, `strk_note_id`) for that transaction's two pre-created open
+//! notes, entirely separate from `bid_id`.
+//!
 //! UNAUDITED. This is a first draft for testnet iteration, not a production deployment —
 //! see STRK20_INTEGRATION_PLAN.md §7 for the required audit step before any mainnet round.
 
@@ -39,8 +47,10 @@ pub struct OpenNoteDeposit {
 
 #[derive(Serde, Copy, Drop, PartialEq, Debug)]
 pub enum FairLaunchAction {
-    Commit: felt252, // commitment = hash(salt) for this note_id
-    Claim,
+    Commit: felt252, // commitment = hash(salt) for this bid_id
+    // (token_note_id, strk_note_id) — this transaction's two freshly-created open notes
+    // (${openNoteIds[0]}, ${openNoteIds[1]}), NOT the bid_id from commit.
+    Claim: (felt252, felt252),
 }
 
 #[derive(Serde, Copy, Drop, starknet::Store)]
@@ -69,9 +79,11 @@ pub trait IErc20<TState> {
 pub trait IFairLaunchAnonymizer<TState> {
     /// Called by the privacy pool via `privacy_invoke`. `Commit` escrows exactly one
     /// `ticket_size` of STRK (already sent by the pool before this call) and records the
-    /// bidder's commitment hash. `Claim` pays out the finalized allocation + refund.
+    /// bidder's commitment hash against `bid_id`. `Claim` pays out the finalized
+    /// allocation + refund into this transaction's own two open notes (see `FairLaunchAction`
+    /// docs — those note ids are NOT `bid_id`).
     fn privacy_invoke(
-        ref self: TState, round_id: u64, note_id: felt252, action: FairLaunchAction,
+        ref self: TState, round_id: u64, bid_id: felt252, action: FairLaunchAction,
     ) -> Span<OpenNoteDeposit>;
 
     /// Admin-only: opens a new fixed-price round. Returns the new round_id.
@@ -85,18 +97,18 @@ pub trait IFairLaunchAnonymizer<TState> {
         reveal_end: u64,
     ) -> u64;
 
-    /// Public, no funds move. Proves `note_id`'s commitment was `hash(salt)` and counts it
+    /// Public, no funds move. Proves `bid_id`'s commitment was `hash(salt)` and counts it
     /// toward the round. Callable by anyone relaying on the bidder's behalf — the caller's
     /// own address is never checked against the bidder, so this doesn't re-link identity.
-    fn reveal(ref self: TState, round_id: u64, note_id: felt252, salt: felt252);
+    fn reveal(ref self: TState, round_id: u64, bid_id: felt252, salt: felt252);
 
     /// Permissionless once `reveal_end` has passed. Computes the uniform clearing ratio
     /// from however many tickets were actually revealed. No-op if already finalized.
     fn finalize(ref self: TState, round_id: u64);
 
     fn get_round(self: @TState, round_id: u64) -> Round;
-    fn is_revealed(self: @TState, round_id: u64, note_id: felt252) -> bool;
-    fn is_claimed(self: @TState, round_id: u64, note_id: felt252) -> bool;
+    fn is_revealed(self: @TState, round_id: u64, bid_id: felt252) -> bool;
+    fn is_claimed(self: @TState, round_id: u64, bid_id: felt252) -> bool;
 }
 
 #[starknet::contract]
@@ -175,14 +187,14 @@ mod FairLaunchAnonymizer {
     struct Committed {
         #[key]
         round_id: u64,
-        note_id: felt252,
+        bid_id: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
     struct Revealed {
         #[key]
         round_id: u64,
-        note_id: felt252,
+        bid_id: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -198,7 +210,7 @@ mod FairLaunchAnonymizer {
     struct Claimed {
         #[key]
         round_id: u64,
-        note_id: felt252,
+        bid_id: felt252,
         tokens_out: u128,
         refund: u128,
     }
@@ -218,15 +230,17 @@ mod FairLaunchAnonymizer {
     #[abi(embed_v0)]
     impl FairLaunchAnonymizerImpl of super::IFairLaunchAnonymizer<ContractState> {
         fn privacy_invoke(
-            ref self: ContractState, round_id: u64, note_id: felt252, action: FairLaunchAction,
+            ref self: ContractState, round_id: u64, bid_id: felt252, action: FairLaunchAction,
         ) -> Span<OpenNoteDeposit> {
             let caller = get_caller_address();
             assert(caller == self.pool_address.read(), errors::BAD_POOL);
 
             match action {
                 FairLaunchAction::Commit(commitment) => self
-                    ._commit(round_id, note_id, commitment),
-                FairLaunchAction::Claim => self._claim(round_id, note_id),
+                    ._commit(round_id, bid_id, commitment),
+                FairLaunchAction::Claim((
+                    token_note_id, strk_note_id,
+                )) => self._claim(round_id, bid_id, token_note_id, strk_note_id),
             }
         }
 
@@ -280,13 +294,13 @@ mod FairLaunchAnonymizer {
             round_id
         }
 
-        fn reveal(ref self: ContractState, round_id: u64, note_id: felt252, salt: felt252) {
+        fn reveal(ref self: ContractState, round_id: u64, bid_id: felt252, salt: felt252) {
             let round = self._get_round(round_id);
             assert(
                 starknet::get_block_timestamp() <= round.reveal_end, errors::REVEAL_NOT_OVER,
             );
 
-            let key = (round_id, note_id);
+            let key = (round_id, bid_id);
             let commitment = self.commitments.entry(key).read();
             assert(commitment != 0, errors::NOT_COMMITTED);
             assert(!self.revealed.entry(key).read(), errors::ALREADY_REVEALED);
@@ -296,7 +310,7 @@ mod FairLaunchAnonymizer {
             let mut updated = round;
             updated.revealed_count += 1;
             self.rounds.entry(round_id).write(updated);
-            self.emit(Revealed { round_id, note_id });
+            self.emit(Revealed { round_id, bid_id });
         }
 
         fn finalize(ref self: ContractState, round_id: u64) {
@@ -339,12 +353,12 @@ mod FairLaunchAnonymizer {
             self._get_round(round_id)
         }
 
-        fn is_revealed(self: @ContractState, round_id: u64, note_id: felt252) -> bool {
-            self.revealed.entry((round_id, note_id)).read()
+        fn is_revealed(self: @ContractState, round_id: u64, bid_id: felt252) -> bool {
+            self.revealed.entry((round_id, bid_id)).read()
         }
 
-        fn is_claimed(self: @ContractState, round_id: u64, note_id: felt252) -> bool {
-            self.claimed.entry((round_id, note_id)).read()
+        fn is_claimed(self: @ContractState, round_id: u64, bid_id: felt252) -> bool {
+            self.claimed.entry((round_id, bid_id)).read()
         }
     }
 
@@ -357,14 +371,14 @@ mod FairLaunchAnonymizer {
         }
 
         fn _commit(
-            ref self: ContractState, round_id: u64, note_id: felt252, commitment: felt252,
+            ref self: ContractState, round_id: u64, bid_id: felt252, commitment: felt252,
         ) -> Span<OpenNoteDeposit> {
             let round = self._get_round(round_id);
             assert(
                 starknet::get_block_timestamp() <= round.commit_end, errors::COMMIT_CLOSED,
             );
 
-            let key = (round_id, note_id);
+            let key = (round_id, bid_id);
             assert(self.commitments.entry(key).read() == 0, errors::ALREADY_COMMITTED);
 
             // The pool already transferred the escrow before invoking us (withdraw < invoke).
@@ -379,19 +393,28 @@ mod FairLaunchAnonymizer {
 
             self.commitments.entry(key).write(commitment);
             self.total_escrowed.write(prior_escrowed + delta_u128);
-            self.emit(Committed { round_id, note_id });
+            self.emit(Committed { round_id, bid_id });
 
             // Nothing paid out yet — the ticket stays escrowed until claim().
             array![].span()
         }
 
+        // `token_note_id` / `strk_note_id` are THIS transaction's freshly-created open
+        // notes (the wallet's ${openNoteIds[0]}/${openNoteIds[1]}), not `bid_id` — see the
+        // module-level note on the two id spaces. Always returns exactly two deposits (one
+        // per pre-created open note), zero-amount where there's nothing to pay, so the
+        // returned array always matches the two open notes the caller created upfront.
         fn _claim(
-            ref self: ContractState, round_id: u64, note_id: felt252,
+            ref self: ContractState,
+            round_id: u64,
+            bid_id: felt252,
+            token_note_id: felt252,
+            strk_note_id: felt252,
         ) -> Span<OpenNoteDeposit> {
             let round = self._get_round(round_id);
             assert(round.finalized, errors::NOT_FINALIZED);
 
-            let key = (round_id, note_id);
+            let key = (round_id, bid_id);
             assert(self.revealed.entry(key).read(), errors::NOT_REVEALED);
             assert(!self.claimed.entry(key).read(), errors::ALREADY_CLAIMED);
             self.claimed.entry(key).write(true);
@@ -408,7 +431,7 @@ mod FairLaunchAnonymizer {
             let refund: u128 = round.ticket_size - strk_used;
 
             self.total_escrowed.write(self.total_escrowed.read() - round.ticket_size);
-            self.emit(Claimed { round_id, note_id, tokens_out, refund });
+            self.emit(Claimed { round_id, bid_id, tokens_out, refund });
 
             let pool = self.pool_address.read();
             if refund != 0 {
@@ -420,19 +443,15 @@ mod FairLaunchAnonymizer {
                 launch.approve(pool, tokens_out.into());
             }
 
-            if tokens_out == 0 {
-                array![OpenNoteDeposit { note_id, token: self.strk_token.read(), amount: refund }]
-                    .span()
-            } else if refund == 0 {
-                array![OpenNoteDeposit { note_id, token: round.launch_token, amount: tokens_out }]
-                    .span()
-            } else {
-                array![
-                    OpenNoteDeposit { note_id, token: round.launch_token, amount: tokens_out },
-                    OpenNoteDeposit { note_id, token: self.strk_token.read(), amount: refund },
-                ]
-                    .span()
-            }
+            array![
+                OpenNoteDeposit {
+                    note_id: token_note_id, token: round.launch_token, amount: tokens_out,
+                },
+                OpenNoteDeposit {
+                    note_id: strk_note_id, token: self.strk_token.read(), amount: refund,
+                },
+            ]
+                .span()
         }
     }
 }

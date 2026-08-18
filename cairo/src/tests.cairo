@@ -60,7 +60,7 @@ fn test_full_fill_single_bidder_conserves_value() {
         );
     stop_cheat_caller_address(anonymizer.contract_address);
 
-    let note_id: felt252 = 'note_1';
+    let bid_id: felt252 = 'bid_1';
     let salt: felt252 = 'salt_1';
     let commitment = poseidon_hash_span(array![salt].span());
 
@@ -68,13 +68,13 @@ fn test_full_fill_single_bidder_conserves_value() {
     escrow_ticket(strk, anonymizer.contract_address, 10000);
     start_cheat_caller_address(anonymizer.contract_address, POOL());
     let commit_result = anonymizer
-        .privacy_invoke(round_id, note_id, FairLaunchAction::Commit(commitment));
+        .privacy_invoke(round_id, bid_id, FairLaunchAction::Commit(commitment));
     stop_cheat_caller_address(anonymizer.contract_address);
     assert(commit_result.len() == 0, 'commit should not pay out');
 
     start_cheat_block_timestamp(anonymizer.contract_address, 150);
-    anonymizer.reveal(round_id, note_id, salt);
-    assert(anonymizer.is_revealed(round_id, note_id), 'should be revealed');
+    anonymizer.reveal(round_id, bid_id, salt);
+    assert(anonymizer.is_revealed(round_id, bid_id), 'should be revealed');
 
     start_cheat_block_timestamp(anonymizer.contract_address, 250);
     anonymizer.finalize(round_id);
@@ -82,16 +82,26 @@ fn test_full_fill_single_bidder_conserves_value() {
     assert(round.finalized, 'should be finalized');
     assert(round.clearing_num == round.clearing_den, 'full fill: ratio should be 1');
 
+    // token_note_id / strk_note_id: this transaction's own fresh open notes — distinct
+    // from bid_id, which only identifies the bidder's state across commit/reveal/claim.
+    let token_note_id: felt252 = 'open_note_token';
+    let strk_note_id: felt252 = 'open_note_strk';
     start_cheat_caller_address(anonymizer.contract_address, POOL());
-    let deposits = anonymizer.privacy_invoke(round_id, note_id, FairLaunchAction::Claim);
+    let deposits = anonymizer
+        .privacy_invoke(round_id, bid_id, FairLaunchAction::Claim((token_note_id, strk_note_id)));
     stop_cheat_caller_address(anonymizer.contract_address);
 
-    // Full fill, no dust: exactly one deposit, all 1000 launch_token, zero STRK refund.
-    assert(deposits.len() == 1, 'expected exactly one deposit');
-    let d = *deposits.at(0);
-    assert(d.token == launch.contract_address, 'wrong token');
-    assert(d.amount == 1000, 'wrong amount');
-    assert(anonymizer.is_claimed(round_id, note_id), 'should be claimed');
+    // Full fill, no dust: two deposits (always one per pre-created open note), 1000
+    // launch_token, zero STRK refund.
+    assert(deposits.len() == 2, 'expected exactly two deposits');
+    let token_deposit = *deposits.at(0);
+    assert(token_deposit.note_id == token_note_id, 'wrong token note id');
+    assert(token_deposit.token == launch.contract_address, 'wrong token');
+    assert(token_deposit.amount == 1000, 'wrong amount');
+    let strk_deposit = *deposits.at(1);
+    assert(strk_deposit.note_id == strk_note_id, 'wrong strk note id');
+    assert(strk_deposit.amount == 0, 'expected zero refund');
+    assert(anonymizer.is_claimed(round_id, bid_id), 'should be claimed');
 
     // Value conservation: every STRK that went in either stays escrowed or was approved back
     // out; the anonymizer never creates or destroys value.
@@ -117,20 +127,20 @@ fn test_unrevealed_bid_forfeits_and_cannot_claim() {
         );
     stop_cheat_caller_address(anonymizer.contract_address);
 
-    let note_id: felt252 = 'note_never_revealed';
+    let bid_id: felt252 = 'bid_never_revealed';
     let salt: felt252 = 'salt_x';
     let commitment = poseidon_hash_span(array![salt].span());
 
     start_cheat_block_timestamp(anonymizer.contract_address, 50);
     escrow_ticket(strk, anonymizer.contract_address, 5000);
     start_cheat_caller_address(anonymizer.contract_address, POOL());
-    anonymizer.privacy_invoke(round_id, note_id, FairLaunchAction::Commit(commitment));
+    anonymizer.privacy_invoke(round_id, bid_id, FairLaunchAction::Commit(commitment));
     stop_cheat_caller_address(anonymizer.contract_address);
 
     // Never call reveal() — bidder forfeits.
     start_cheat_block_timestamp(anonymizer.contract_address, 250);
     anonymizer.finalize(round_id);
-    assert(!anonymizer.is_revealed(round_id, note_id), 'should stay unrevealed');
+    assert(!anonymizer.is_revealed(round_id, bid_id), 'should stay unrevealed');
 
     // The ticket stays escrowed in the contract — forfeited, not returned.
     assert(strk.balance_of(anonymizer.contract_address) == 5000, 'forfeited ticket stays escrowed');
