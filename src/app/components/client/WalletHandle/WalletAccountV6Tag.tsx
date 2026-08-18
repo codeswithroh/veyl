@@ -244,6 +244,7 @@ export default function WalletAccountV6Tag() {
   // --- Trade (private swap via AVNU) ------------------------------------
   const avnuConfig = AVNU_CONFIG[myFrontendProviderIndex];
   const [tradeTokens, setTradeTokens] = useState<Token[]>([]);
+  const [tradeTokensLoading, setTradeTokensLoading] = useState<boolean>(true);
   const [tradeTokensError, setTradeTokensError] = useState<string>("");
   const [buyTokenAddress, setBuyTokenAddress] = useState<string>("");
   const [sellAmountStr, setSellAmountStr] = useState<string>("1");
@@ -259,6 +260,7 @@ export default function WalletAccountV6Tag() {
   useEffect(() => {
     if (!avnuConfig) return;
     let cancelled = false;
+    setTradeTokensLoading(true);
     setTradeTokensError("");
     fetchTokens({ tags: ["Verified"], size: 30 }, { baseUrl: avnuConfig.baseUrl })
       .then((page) => {
@@ -276,6 +278,9 @@ export default function WalletAccountV6Tag() {
       })
       .catch((err: any) => {
         if (!cancelled) setTradeTokensError(err?.message ?? String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setTradeTokensLoading(false);
       });
     return () => {
       cancelled = true;
@@ -1006,7 +1011,9 @@ export default function WalletAccountV6Tag() {
                 disabled={!tradeTokens.length}
                 aria-label="Token to buy"
               >
-                {tradeTokens.length === 0 && <option value="">Loading tokens…</option>}
+                {tradeTokens.length === 0 && (
+                  <option value="">{tradeTokensLoading ? "Loading tokens…" : "No tokens available"}</option>
+                )}
                 {tradeTokens.map((t) => (
                   <option key={t.address} value={t.address}>{t.symbol}</option>
                 ))}
@@ -1017,6 +1024,11 @@ export default function WalletAccountV6Tag() {
             </div>
           </div>
 
+          {!tradeTokensLoading && !tradeTokensError && tradeTokens.length === 0 && (
+            <div className={styles.warn}>
+              AVNU doesn&apos;t list any tokens on Sepolia — Trade only works on Mainnet. This isn&apos;t a wallet or connection issue.
+            </div>
+          )}
           {tradeTokensError && <div className={styles.warn}>Couldn&apos;t load tokens: {tradeTokensError}</div>}
           {quoteError && <div className={styles.warn}>{quoteError}</div>}
         </>
