@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { hash, json, num, shortString, validateAndParseAddress } from "starknet";
+import { Contract, hash, json, num, shortString, validateAndParseAddress } from "starknet";
 import type { WALLET_API } from "@starknet-io/types-js";
 import {
   getQuotes,
@@ -160,16 +160,49 @@ function errorResult(msg: string): ActionResult {
 }
 
 // Tabs - one STRK20 action each (Umbra-style single-action interface), plus
-// Trade (private swap via AVNU) which gets its own custom render block below.
-type TabKey = "trade" | "shield" | "send" | "unshield" | "echo" | "balances";
+// Trade (private swap via AVNU) and Launch (sealed-bid fair launch), which each get
+// their own custom render block below.
+type TabKey = "trade" | "launch" | "shield" | "send" | "unshield" | "echo" | "balances";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "trade", label: "Trade" },
+  { key: "launch", label: "Launch" },
   { key: "shield", label: "Shield" },
   { key: "send", label: "Send" },
   { key: "unshield", label: "Unshield" },
   { key: "echo", label: "Echo" },
   { key: "balances", label: "Balances" },
 ];
+
+// FairLaunchAnonymizer round, as returned by get_round (see constants.FairLaunchAnonymizerAbi).
+type FairLaunchRound = {
+  launch_token: string;
+  price: bigint;
+  total_supply: bigint;
+  ticket_size: bigint;
+  commit_end: bigint;
+  reveal_end: bigint;
+  revealed_count: bigint;
+  finalized: boolean;
+  clearing_num: bigint;
+  clearing_den: bigint;
+};
+
+// Locally-held bid credentials (bid_id + salt) - the only place these live. Losing this
+// before reveal forfeits the bid; there is no recovery, by design (the contract never
+// sees the salt until reveal).
+type BidCreds = { bidId: string; salt: string };
+
+function bidCredsStorageKey(anonymizer: string, roundId: bigint, wallet: string): string {
+  return `veyl-fair-launch-bid:${anonymizer}:${roundId}:${wallet}`;
+}
+
+function randomFelt(): string {
+  const bytes = new Uint8Array(31); // 248 bits, safely under the STARK field prime
+  crypto.getRandomValues(bytes);
+  let hex = "0x";
+  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+  return hex;
+}
 
 export default function WalletAccountV6Tag() {
   const myFrontendProviderIndex = useFrontendProvider(
@@ -341,6 +374,243 @@ export default function WalletAccountV6Tag() {
       setResultTrade(errorResult(err?.message ?? err?.toString?.() ?? String(err)));
     } finally {
       setSwapping(false);
+    }
+  };
+
+  // --- Launch (sealed-bid fair launch via FairLaunchAnonymizer) ----------
+  const fairLaunchAddr = constants.fairLaunchAnonymizerForIndex(myFrontendProviderIndex);
+  const hasFairLaunch = (() => {
+    try {
+      return num.toBigInt(fairLaunchAddr) !== 0n;
+    } catch {
+      return false;
+    }
+  })();
+  // Single demo round (round_id 0) - the one created live on Sepolia. A real launch
+  // page would list/select rounds; scoped to one for this first pass.
+  const launchRoundId = 0n;
+  const [round, setRound] = useState<FairLaunchRound | null>(null);
+  const [roundError, setRoundError] = useState<string>("");
+  const [bidCreds, setBidCreds] = useState<BidCreds | null>(null);
+  const [bidRevealed, setBidRevealed] = useState<boolean | null>(null);
+  const [bidClaimed, setBidClaimed] = useState<boolean | null>(null);
+  const [resultCommit, setResultCommit] = useState<ActionResult | null>(null);
+  const [resultReveal, setResultReveal] = useState<ActionResult | null>(null);
+  const [resultFinalize, setResultFinalize] = useState<ActionResult | null>(null);
+  const [resultClaim, setResultClaim] = useState<ActionResult | null>(null);
+  const [committing, setCommitting] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+
+  const fairLaunchReader = (() => {
+    if (!hasFairLaunch) return null;
+    const provider = constants.myFrontendProviders[myFrontendProviderIndex];
+    if (!provider) return null;
+    return new Contract({
+      abi: constants.FairLaunchAnonymizerAbi as unknown as any,
+      address: fairLaunchAddr,
+      providerOrAccount: provider,
+    });
+  })();
+
+  // Load round state + this wallet's bid credentials (if it has committed before).
+  useEffect(() => {
+    if (!fairLaunchReader) return;
+    let cancelled = false;
+    setRoundError("");
+    fairLaunchReader
+      .call("get_round", [launchRoundId])
+      .then((r: any) => {
+        if (cancelled) return;
+        setRound({
+          launch_token: num.toHex(r.launch_token),
+          price: BigInt(r.price),
+          total_supply: BigInt(r.total_supply),
+          ticket_size: BigInt(r.ticket_size),
+          commit_end: BigInt(r.commit_end),
+          reveal_end: BigInt(r.reveal_end),
+          revealed_count: BigInt(r.revealed_count),
+          finalized: Boolean(r.finalized),
+          clearing_num: BigInt(r.clearing_num),
+          clearing_den: BigInt(r.clearing_den),
+        });
+      })
+      .catch((err: any) => {
+        if (!cancelled) setRoundError(err?.message ?? String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fairLaunchReader, fairLaunchAddr, myFrontendProviderIndex]);
+
+  useEffect(() => {
+    if (!connectedAddress || !hasFairLaunch) {
+      setBidCreds(null);
+      return;
+    }
+    const key = bidCredsStorageKey(fairLaunchAddr, launchRoundId, connectedAddress);
+    const raw = window.localStorage.getItem(key);
+    setBidCreds(raw ? (JSON.parse(raw) as BidCreds) : null);
+  }, [connectedAddress, fairLaunchAddr, hasFairLaunch]);
+
+  useEffect(() => {
+    if (!fairLaunchReader || !bidCreds) {
+      setBidRevealed(null);
+      setBidClaimed(null);
+      return;
+    }
+    let cancelled = false;
+    fairLaunchReader
+      .call("is_revealed", [launchRoundId, bidCreds.bidId])
+      .then((v: any) => !cancelled && setBidRevealed(Boolean(v)));
+    fairLaunchReader
+      .call("is_claimed", [launchRoundId, bidCreds.bidId])
+      .then((v: any) => !cancelled && setBidClaimed(Boolean(v)));
+    return () => {
+      cancelled = true;
+    };
+  }, [fairLaunchReader, bidCreds]);
+
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+  const commitOpen = round ? nowSec <= round.commit_end : false;
+  const revealOpen = round ? nowSec <= round.reveal_end : false;
+  const canFinalize = round ? !round.finalized && nowSec > round.reveal_end : false;
+
+  // Commit: escrow one ticket, store a fresh (bid_id, salt) locally, submit
+  // hash(salt) as the commitment. Losing the local copy before reveal forfeits the bid.
+  const handleCommit = async () => {
+    setResultCommit(null);
+    if (!connectedAddress || !round) {
+      setResultCommit(errorResult("Connect a wallet first."));
+      return;
+    }
+    if (bidCreds) {
+      setResultCommit(errorResult("Already committed for this round from this wallet."));
+      return;
+    }
+    setCommitting(true);
+    try {
+      const bidId = randomFelt();
+      const salt = randomFelt();
+      const commitment = hash.computePoseidonHashOnElements([salt]);
+      const actions: WALLET_API.STRK20_ACTION[] = [
+        { type: "withdraw", token: TOKEN, amount: num.toHex(round.ticket_size), recipient: fairLaunchAddr },
+        {
+          type: "invoke",
+          contract: fairLaunchAddr,
+          calldata: [num.toHex(launchRoundId), bidId, "0", num.toHex(commitment)],
+        },
+      ];
+      const txH = await submit(actions, setResultCommit, `${fmtStrk(round.ticket_size)} STRK ticket`);
+      if (txH) {
+        const creds: BidCreds = { bidId, salt };
+        window.localStorage.setItem(
+          bidCredsStorageKey(fairLaunchAddr, launchRoundId, connectedAddress),
+          JSON.stringify(creds)
+        );
+        setBidCreds(creds);
+      }
+    } finally {
+      setCommitting(false);
+    }
+  };
+
+  // Reveal: plain contract call (no funds move) - proves hash(salt) == commitment.
+  const handleReveal = async () => {
+    setResultReveal(null);
+    if (!myWalletAccount || !bidCreds) {
+      setResultReveal(errorResult("No committed bid to reveal from this wallet."));
+      return;
+    }
+    setRevealing(true);
+    try {
+      setResultReveal({ status: "pending", title: "Confirm the reveal in your wallet…" });
+      const { transaction_hash } = await myWalletAccount.execute([
+        {
+          contractAddress: fairLaunchAddr,
+          entrypoint: "reveal",
+          calldata: [num.toHex(launchRoundId), bidCreds.bidId, bidCreds.salt],
+        },
+      ]);
+      const provider = constants.myFrontendProviders[myFrontendProviderIndex];
+      const txR = await provider.waitForTransaction(transaction_hash, { retries: 300, retryInterval: 3000 });
+      setResultReveal(receiptToResult(txR, transaction_hash, "Reveal"));
+      setBidRevealed(true);
+    } catch (error: any) {
+      setResultReveal(errorResult(error?.message ?? error?.toString?.() ?? String(error)));
+    } finally {
+      setRevealing(false);
+    }
+  };
+
+  // Finalize: permissionless plain call, no funds move - computes the clearing ratio.
+  const handleFinalize = async () => {
+    setResultFinalize(null);
+    if (!myWalletAccount) {
+      setResultFinalize(errorResult("Connect a wallet first (any wallet can finalize)."));
+      return;
+    }
+    setFinalizing(true);
+    try {
+      setResultFinalize({ status: "pending", title: "Confirm finalize in your wallet…" });
+      const { transaction_hash } = await myWalletAccount.execute([
+        { contractAddress: fairLaunchAddr, entrypoint: "finalize", calldata: [num.toHex(launchRoundId)] },
+      ]);
+      const provider = constants.myFrontendProviders[myFrontendProviderIndex];
+      const txR = await provider.waitForTransaction(transaction_hash, { retries: 300, retryInterval: 3000 });
+      setResultFinalize(receiptToResult(txR, transaction_hash, "Finalize"));
+      fairLaunchReader?.call("get_round", [launchRoundId]).then((r: any) =>
+        setRound({
+          launch_token: num.toHex(r.launch_token),
+          price: BigInt(r.price),
+          total_supply: BigInt(r.total_supply),
+          ticket_size: BigInt(r.ticket_size),
+          commit_end: BigInt(r.commit_end),
+          reveal_end: BigInt(r.reveal_end),
+          revealed_count: BigInt(r.revealed_count),
+          finalized: Boolean(r.finalized),
+          clearing_num: BigInt(r.clearing_num),
+          clearing_den: BigInt(r.clearing_den),
+        })
+      );
+    } catch (error: any) {
+      setResultFinalize(errorResult(error?.message ?? error?.toString?.() ?? String(error)));
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
+  // Claim: creates two fresh open notes (token + STRK refund) via the wallet's
+  // ${openNoteIds[N]} placeholders, then invokes Claim with those two ids explicitly -
+  // NOT bid_id, which only identifies this bidder's state inside the contract.
+  const handleClaim = async () => {
+    setResultClaim(null);
+    if (!connectedAddress || !round || !bidCreds) {
+      setResultClaim(errorResult("No revealed bid to claim from this wallet."));
+      return;
+    }
+    setClaiming(true);
+    try {
+      const actions: WALLET_API.STRK20_ACTION[] = [
+        { type: "transfer", token: round.launch_token, amount: "OPEN", recipient: connectedAddress },
+        { type: "transfer", token: TOKEN, amount: "OPEN", recipient: connectedAddress },
+        {
+          type: "invoke",
+          contract: fairLaunchAddr,
+          calldata: [
+            num.toHex(launchRoundId),
+            bidCreds.bidId,
+            "1",
+            "${openNoteIds[0]}",
+            "${openNoteIds[1]}",
+          ],
+        },
+      ];
+      const txH = await submit(actions, setResultClaim, "Fair-launch claim");
+      if (txH) setBidClaimed(true);
+    } finally {
+      setClaiming(false);
     }
   };
 
@@ -651,7 +921,7 @@ export default function WalletAccountV6Tag() {
   // Per-tab content: label, the fixed amount + token, a one-line hint, the CTA
   // label, its handler, and the structured result.
   const CONFIG: Record<
-    Exclude<TabKey, "trade">,
+    Exclude<TabKey, "trade" | "launch">,
     { label: string; value: string; token: string; hint: string; cta: string; onRun: () => void; result: ActionResult | null; disabled: boolean }
   > = {
     shield: { label: "You're shielding", value: "10", token: "STRK", hint: "Deposit into the privacy pool", cta: "Shield", onRun: handleShield, result: resultShield, disabled: !isStrk20Network },
@@ -660,7 +930,20 @@ export default function WalletAccountV6Tag() {
     echo: { label: "Echo invoke round-trip", value: "5", token: "STRK", hint: "Withdraw → helper → refill open note", cta: "Run echo", onRun: handleComplex, result: resultComplex, disabled: !isStrk20Network || !hasEchoHelper },
     balances: { label: "Shielded balances", value: "All", token: "tokens", hint: "Read your private pool balances", cta: "Query balances", onRun: handleBalances, result: resultBalances, disabled: !isStrk20Network },
   };
-  const active = tab === "trade" ? null : CONFIG[tab];
+  const active = tab === "trade" || tab === "launch" ? null : CONFIG[tab];
+
+  // Round phase, for the Launch tab's status pill.
+  const roundPhase = !round
+    ? "loading"
+    : round.finalized
+    ? "finalized"
+    : canFinalize
+    ? "ready to finalize"
+    : revealOpen && !commitOpen
+    ? "reveal"
+    : commitOpen
+    ? "commit"
+    : "closed";
 
   return (
     <div className={styles.panel}>
@@ -736,6 +1019,109 @@ export default function WalletAccountV6Tag() {
 
           {tradeTokensError && <div className={styles.warn}>Couldn&apos;t load tokens: {tradeTokensError}</div>}
           {quoteError && <div className={styles.warn}>{quoteError}</div>}
+        </>
+      )}
+
+      {/* Launch: sealed-bid fair launch - round status + commit/reveal/finalize/claim */}
+      {tab === "launch" && (
+        <>
+          {!hasFairLaunch ? (
+            <div className={styles.warn}>
+              No fair-launch round deployed on {networkName ?? "this network"} yet. Switch to
+              Sepolia to see the live demo round.
+            </div>
+          ) : roundError ? (
+            <div className={styles.warn}>Couldn&apos;t load round: {roundError}</div>
+          ) : round ? (
+            <>
+              <div className={styles.inputBlock}>
+                <div className={styles.inputLabel}>Round #{launchRoundId.toString()} — {roundPhase}</div>
+                <div className={styles.inputMain}>
+                  <div className={styles.bigValue}>{fmtStrk(round.ticket_size)}</div>
+                  <span className={styles.tokenPill}>
+                    <span className={styles.tokenDot}>
+                      <StrkCoin size={22} />
+                    </span>
+                    STRK ticket
+                  </span>
+                </div>
+                <div className={styles.subLine}>
+                  <span>
+                    {fmtUnits(round.total_supply, 18)} tokens on offer · {round.revealed_count.toString()} revealed
+                  </span>
+                  <span className={styles.subMono}>{shortHex(round.launch_token)}</span>
+                </div>
+              </div>
+
+              {round.finalized && (
+                <div className={styles.subLine} style={{ marginTop: 6 }}>
+                  <span>
+                    Clearing:{" "}
+                    {round.clearing_den === 0n
+                      ? "no bids revealed"
+                      : round.clearing_num === round.clearing_den
+                      ? "full fill"
+                      : `pro-rata (${((Number(round.clearing_num) / Number(round.clearing_den)) * 100).toFixed(1)}%)`}
+                  </span>
+                </div>
+              )}
+
+              {isConnected && (
+                <div className={styles.subLine} style={{ marginTop: 6 }}>
+                  <span>Your bid</span>
+                  <span className={styles.subMono}>
+                    {!bidCreds
+                      ? "not committed"
+                      : bidClaimed
+                      ? "claimed"
+                      : bidRevealed
+                      ? "revealed, awaiting finalize"
+                      : "committed, awaiting reveal"}
+                  </span>
+                </div>
+              )}
+
+              {isConnected && (
+                <div className={styles.launchActions}>
+                  <button
+                    className={`${styles.btn} ${styles.btnGreen}`}
+                    disabled={committing || !commitOpen || !!bidCreds}
+                    onClick={handleCommit}
+                  >
+                    {committing ? "Committing…" : "Commit ticket"}
+                  </button>
+                  <button
+                    className={`${styles.btn} ${styles.btnGhost}`}
+                    disabled={revealing || !bidCreds || !!bidRevealed || !revealOpen}
+                    onClick={handleReveal}
+                  >
+                    {revealing ? "Revealing…" : "Reveal"}
+                  </button>
+                  <button
+                    className={`${styles.btn} ${styles.btnGhost}`}
+                    disabled={finalizing || !canFinalize}
+                    onClick={handleFinalize}
+                  >
+                    {finalizing ? "Finalizing…" : "Finalize round"}
+                  </button>
+                  <button
+                    className={`${styles.btn} ${styles.btnGreen}`}
+                    disabled={claiming || !bidCreds || !bidRevealed || !round.finalized || !!bidClaimed}
+                    onClick={handleClaim}
+                  >
+                    {claiming ? "Claiming…" : "Claim"}
+                  </button>
+                </div>
+              )}
+
+              {resultCommit && <ResultCard r={resultCommit} />}
+              {resultReveal && <ResultCard r={resultReveal} />}
+              {resultFinalize && <ResultCard r={resultFinalize} />}
+              {resultClaim && <ResultCard r={resultClaim} />}
+            </>
+          ) : (
+            <div className={styles.subLine}>Loading round…</div>
+          )}
         </>
       )}
 

@@ -93,7 +93,13 @@ Steps:
 
 **Deployed to Sepolia 2026-08-18, with your explicit go-ahead.** Declared class `0x2a96673fb3019abe033aa8cbf6cbf47ceffca0e2e41c196704c21b1da2b3769`, instance `0x6839e11d1fae2b1b6981900c301a1a4b5f164412b696faa731b98d72a859436` (full addresses in `cairo/address.md`), constructor wired to the **real** Sepolia STRK20 pool as `pool_address` — production-correct, not a stub. Ran `create_round` for real on-chain (round_id 0, no funds moved) and read it back correctly.
 
-**A full pool-mediated `commit → reveal → finalize → claim` round is not yet verified** — `commit`/`claim` only accept calls from `pool_address` (the real pool), and reaching that requires the same self-hosted Transaction Prover + Discovery Service infra that Phase 2's end-to-end verification is blocked on (§6). The commit/claim/finalize *logic itself* is verified by the `snforge` unit tests in `cairo/src/tests.cairo` (full-fill value conservation, forfeited-bid-stays-escrowed) — exercising the identical code paths against a mock pool caller. Live pool-mediated verification is deferred alongside Phase 2's, for the same reason.
+**Correction to an earlier note in this section:** `commit`/`claim` go through the **Wallet API route** (`myWalletAccount.strk20InvokeTransaction`, same as Shield/Send/Unshield/Echo/Trade), where the user's own wallet handles proving — this does **not** need Veyl's self-hosted Transaction Prover/Discovery Service (that infra gap is specific to Phase 2's SDK-route shadow-account backend, §6, not to Wallet API actions). An earlier pass of this file conflated the two; corrected here.
+
+**Launch + bid UI built on the dashboard (Launch tab, `WalletAccountV6Tag.tsx`)** — round status, Commit (escrows one ticket + records `hash(salt)` via `privacy_invoke`, same pattern as the Echo tab), Reveal (plain call), Finalize (plain call), Claim (via `privacy_invoke`, using two fresh open notes per the `bid_id`-vs-open-note-id split — see `cairo/README.md`). Bid credentials (`bid_id`, `salt`) are generated client-side and held only in `localStorage`; the contract never sees the salt until reveal.
+
+**What's verified:** build/typecheck clean, live-rendered against the real deployed Sepolia round (round #0) — the Launch tab correctly reads `get_round` on-chain and shows live phase/ticket/supply data.
+
+**What isn't yet verified:** an actual Commit/Reveal/Finalize/Claim transaction through a real connected wallet (Ready extension) — this dev environment has no wallet extension to test against. The action-list shape (`withdraw` + `invoke` for commit; two `transfer: OPEN` + `invoke` for claim) mirrors the Echo tab's already-working pattern, but the specific *two-open-note* claim shape is new and unconfirmed against the real Wallet API. Needs a manual pass with Ready on Sepolia before trusting it in front of real users.
 
 ## 8. Testing
 

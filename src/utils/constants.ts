@@ -43,3 +43,88 @@ export function echoHelperForIndex(index: number): string {
 // Frontend provider indices where the STRK20 privacy pool is available, mapped to a
 // display name. Used to gate the WalletAccountV6 STRK20 actions.
 export const Strk20Networks: Record<number, string> = { 0: "MAINNET", 2: "SEPOLIA" };
+
+// ─── Fair-launch anonymizer (cairo/src/lib.cairo — FairLaunchAnonymizer) ───────
+// UNAUDITED, Sepolia-only for now. See cairo/README.md and STRK20_INTEGRATION_PLAN.md
+// §7 before pointing a real launch at this.
+
+// Deployed 2026-08-18, real Sepolia STRK20 pool wired as pool_address. "0x0" = not
+// deployed on this network (mainnet: no deployment yet, needs its own explicit go
+// after a verified Sepolia round — see STRK20_INTEGRATION_PLAN.md §7).
+export const FairLaunchAnonymizerSepolia = "0x3aae3546a8d5da7aa79719afa0703750aa7a6da64abdc2e280f34e08afd05bb";
+export const FairLaunchAnonymizerMainnet = "0x0";
+
+// Resolve the fair-launch anonymizer for a frontend provider index (0 = Mainnet, 2 = Sepolia).
+// Returns "0x0" when no instance is deployed on that network.
+export function fairLaunchAnonymizerForIndex(index: number): string {
+    if (index === 0) return FairLaunchAnonymizerMainnet;
+    if (index === 2) return FairLaunchAnonymizerSepolia;
+    return "0x0";
+}
+
+// Minimal ABI fragment — just the read/plain-call entrypoints the frontend calls
+// directly (get_round, reveal, finalize). commit/claim go through privacy_invoke via
+// the wallet's STRK20 "invoke" action (raw felt calldata, no ABI needed there).
+export const FairLaunchAnonymizerAbi = [
+    {
+        type: "struct",
+        name: "strk20_invoke_helper::Round",
+        members: [
+            { name: "launch_token", type: "core::starknet::contract_address::ContractAddress" },
+            { name: "price", type: "core::integer::u128" },
+            { name: "total_supply", type: "core::integer::u128" },
+            { name: "ticket_size", type: "core::integer::u128" },
+            { name: "commit_end", type: "core::integer::u64" },
+            { name: "reveal_end", type: "core::integer::u64" },
+            { name: "revealed_count", type: "core::integer::u64" },
+            { name: "finalized", type: "core::bool" },
+            { name: "clearing_num", type: "core::integer::u128" },
+            { name: "clearing_den", type: "core::integer::u128" },
+        ],
+    },
+    {
+        type: "function",
+        name: "get_round",
+        inputs: [{ name: "round_id", type: "core::integer::u64" }],
+        outputs: [{ type: "strk20_invoke_helper::Round" }],
+        state_mutability: "view",
+    },
+    {
+        type: "function",
+        name: "is_revealed",
+        inputs: [
+            { name: "round_id", type: "core::integer::u64" },
+            { name: "bid_id", type: "core::felt252" },
+        ],
+        outputs: [{ type: "core::bool" }],
+        state_mutability: "view",
+    },
+    {
+        type: "function",
+        name: "is_claimed",
+        inputs: [
+            { name: "round_id", type: "core::integer::u64" },
+            { name: "bid_id", type: "core::felt252" },
+        ],
+        outputs: [{ type: "core::bool" }],
+        state_mutability: "view",
+    },
+    {
+        type: "function",
+        name: "reveal",
+        inputs: [
+            { name: "round_id", type: "core::integer::u64" },
+            { name: "bid_id", type: "core::felt252" },
+            { name: "salt", type: "core::felt252" },
+        ],
+        outputs: [],
+        state_mutability: "external",
+    },
+    {
+        type: "function",
+        name: "finalize",
+        inputs: [{ name: "round_id", type: "core::integer::u64" }],
+        outputs: [],
+        state_mutability: "external",
+    },
+] as const;
