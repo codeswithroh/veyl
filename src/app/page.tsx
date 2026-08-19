@@ -39,32 +39,32 @@ const IconGithub = () => (
 );
 
 const WHY = [
-  { Icon: IconShield, title: 'Cryptographic privacy', body: 'Sender, recipient, and amount stay encrypted inside the STRK20 pool — not hidden by policy, hidden by math.' },
-  { Icon: IconActivity, title: 'Real STRK20 mainnet', body: 'No testnet theater. Every shield, transfer, and trade runs against the live pool on Starknet.' },
-  { Icon: IconRocket, title: 'Sealed-bid fair launches', body: 'Bids are escrowed notes, revealed only at settlement — no first-block sniping war.' },
-  { Icon: IconLocked, title: 'You hold the keys', body: 'Veyl never custodies funds. Shield and trade through your own wallet, end to end.' },
+  { Icon: IconShield, title: 'Cryptographic privacy', body: 'Sender, recipient, and amount stay encrypted inside the STRK20 privacy pool. That privacy comes from cryptography, not from a policy someone has to trust.' },
+  { Icon: IconActivity, title: 'Runs on the real pool', body: 'Every shield, transfer, and trade runs against the actual STRK20 privacy pool contract, not a simulation. Veyl is testing on Starknet Sepolia before moving fully to Mainnet.' },
+  { Icon: IconRocket, title: 'Private token launches', body: 'Every bid is locked in privately and only revealed once the round ends, so bots cannot front-run the opening block.' },
+  { Icon: IconLocked, title: 'You hold the keys', body: 'Veyl never holds your funds. You shield and trade through your own wallet the whole time.' },
 ];
 
 const FAQ = [
   {
     q: 'Is Veyl a launchpad?',
-    a: "No — Veyl is a private trading terminal. Fair launches are one feature built on the same sealed-bid mechanism, not the product itself.",
+    a: 'No. Veyl is a private trading terminal. Fair token launches are one feature built using the same privacy technology, not the main product.',
   },
   {
     q: 'Which tokens can I trade?',
-    a: 'Any token Starknet has liquidity for. Memecoins are the sharpest early use case, not a limit — Veyl is a privacy and execution layer, not a fixed token list.',
+    a: "Any token that has liquidity on Starknet. Memecoins are the clearest early use case, but that's not a limit. Veyl adds a privacy layer on top of trading, it doesn't maintain its own fixed list of tokens.",
   },
   {
     q: "How is this different from just shielding funds in my wallet?",
-    a: "Wallets are explicitly barred from touching your viewing key, so they can't generate the unlinkable per-trade identity Veyl uses, or run a sealed-bid launch. That needs a backend — which is what Veyl adds on top of the wallet-native shield/unshield you already have.",
+    a: "Your wallet can already shield and unshield funds on its own, but it's deliberately blocked from touching your viewing key (the private key that decrypts your shielded balance). That's what keeps your wallet secure, but it also means your wallet alone can't generate a new, unlinked wallet for each trade, or run a private auction for a token launch. Both need a backend service, which is what Veyl adds on top of the shield and unshield features your wallet already has.",
   },
   {
     q: 'Does Veyl custody my funds?',
-    a: 'No. You shield and trade through your own connected wallet, end to end. Veyl never holds your assets.',
+    a: 'No. You shield and trade through your own connected wallet the entire time. Veyl never holds your assets.',
   },
   {
     q: 'Is this live on mainnet?',
-    a: 'The shield, unshield, and private-transfer base runs on the real STRK20 mainnet pool today. The unlinkable-execution-wallet backend and the fair-launch contract are still in active development — see the repo for current status.',
+    a: "Veyl's code (shield, unshield, private transfer, and the fair-launch contract) is built to run on the real STRK20 pool, on Starknet Mainnet or Sepolia. Veyl is currently testing on Sepolia before moving fully to Mainnet. See strk20.json in the repo for the current deployed contracts and live transactions.",
   },
 ];
 
@@ -164,10 +164,10 @@ export default function Page() {
 
           <div className={styles.heroContent}>
             <span className={`${styles.eyebrow} js-eyebrow`}>The private trading terminal for Starknet</span>
-            <h1 className={`${styles.h1} js-h1`}>Step Into The Future<br />Of Private Trading</h1>
+            <h1 className={`${styles.h1} js-h1`}>Trade Starknet Tokens<br />Without Exposing Your Wallet</h1>
             <p className={`${styles.lede} js-lede`}>
-              Trade any token Starknet has liquidity for — from an execution identity
-              that isn&apos;t linkable back to your funding wallet. Shield once, trade freely.
+              Trade any token with liquidity on Starknet from a wallet address that
+              can&apos;t be linked back to the funds behind it. Shield your funds once, then trade as often as you like.
             </p>
             <div className={`${styles.heroCtas} js-ctas`}>
               <SelectWallet variant="ctaCompact" />
@@ -178,7 +178,7 @@ export default function Page() {
           <div className={`${styles.dashboardFloat} js-dashboard`}>
             <Image
               src="/media/trading-dashboard-transparent.png"
-              alt="Veyl trading dashboard preview — markets, balance, exchange panels"
+              alt="Veyl trading dashboard preview, showing markets, balances, and exchange panels"
               width={1582}
               height={597}
               className={styles.dashboardImg}
@@ -208,8 +208,8 @@ export default function Page() {
               <p>Shielded balances, unlinkable transfers. Built as a wallet feature, not a place to trade.</p>
             </div>
             <div className={styles.positionResult}>
-              <h3>Veyl is both, at once.</h3>
-              <p>A trading terminal for any token Starknet has liquidity for — where the identity behind every trade is cryptographically unlinkable. Not a launchpad; fair launches are one feature built on the same mechanism.</p>
+              <h3>Veyl is both.</h3>
+              <p>A trading terminal for any token with liquidity on Starknet, where every trade comes from a wallet address that can&apos;t be traced back to your funding wallet. It is not a launchpad. Fair token launches are one feature built on the same privacy technology, not the main product.</p>
             </div>
           </div>
         </section>
@@ -220,7 +220,7 @@ export default function Page() {
             <div className={styles.sectionText}>
               <span className={styles.eyebrow}>How it works</span>
               <h2 className={styles.h2}>One mechanism. Two tracks.</h2>
-              <p className={styles.sectionSub}>Escrow something, reveal it only at settlement, never expose who&apos;s behind it. Trading uses this constantly; launching uses it once per token.</p>
+              <p className={styles.sectionSub}>The same idea powers both tracks below: lock something up, reveal it only when it settles, and never expose who is behind it. Trading uses this every time you trade. Launching uses it once per token.</p>
 
               <div className={styles.track}>
                 <div className={styles.trackHead}>
@@ -262,21 +262,21 @@ export default function Page() {
                     <span className={styles.stepNum}>01</span>
                     <div>
                       <h3>List the launch</h3>
-                      <p>Set the token and terms for a sealed-bid round.</p>
+                      <p>Set the token and terms for a private auction round.</p>
                     </div>
                   </div>
                   <div className={styles.step}>
                     <span className={styles.stepNum}>02</span>
                     <div>
-                      <h3>Sealed bids come in</h3>
-                      <p>Real funds, escrowed as encrypted notes — nobody sees the book.</p>
+                      <h3>Bids come in privately</h3>
+                      <p>Real funds are locked in as encrypted deposits. No one, including Veyl, can see who has bid or how much until the round ends.</p>
                     </div>
                   </div>
                   <div className={styles.step}>
                     <span className={styles.stepNum}>03</span>
                     <div>
                       <h3>Settles at once</h3>
-                      <p>One clearing price, revealed only at settlement. No first-block snipe.</p>
+                      <p>Every bid is revealed together and the round settles at a single price, so no one can act on early information.</p>
                     </div>
                   </div>
                 </div>
@@ -360,7 +360,7 @@ export default function Page() {
               </g>
             </svg>
             <h2>Trade without being watched.</h2>
-            <p>Shield once, then trade freely — wired to the real STRK20 mainnet pool.</p>
+            <p>Shield once, then trade freely. Every action runs against the real STRK20 privacy pool contract on Starknet.</p>
             <div className={styles.heroCtas}>
               <SelectWallet variant="ctaCompact" />
             </div>
@@ -375,7 +375,7 @@ export default function Page() {
             <span className={styles.wordmark}>VEYL</span>
             <p>Private launch &amp; trading terminal on Starknet, built on the STRK20 privacy pool.</p>
             <span className={styles.creditStamp}>
-              <IconTimer /> Cleared on Starknet
+              <IconTimer /> Live on Starknet
             </span>
           </div>
           <div className={styles.footerCol}>

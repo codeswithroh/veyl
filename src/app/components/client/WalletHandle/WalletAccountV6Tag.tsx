@@ -930,9 +930,9 @@ export default function WalletAccountV6Tag() {
     { label: string; value: string; token: string; hint: string; cta: string; onRun: () => void; result: ActionResult | null; disabled: boolean }
   > = {
     shield: { label: "You're shielding", value: "10", token: "STRK", hint: "Deposit into the privacy pool", cta: "Shield", onRun: handleShield, result: resultShield, disabled: !isStrk20Network },
-    send: { label: "You're sending - to self", value: "1", token: "STRK", hint: "Private in-pool transfer", cta: "Self transfer", onRun: handleSelfTransfer, result: resultTransfer, disabled: !isStrk20Network },
+    send: { label: "You're sending to yourself", value: "1", token: "STRK", hint: "Private transfer inside the pool", cta: "Self transfer", onRun: handleSelfTransfer, result: resultTransfer, disabled: !isStrk20Network },
     unshield: { label: "You're unshielding", value: "1", token: "STRK", hint: "Withdraw to your account", cta: "Unshield", onRun: handleUnshield, result: resultUnshield, disabled: !isStrk20Network },
-    echo: { label: "Echo invoke round-trip", value: "5", token: "STRK", hint: "Withdraw → helper → refill open note", cta: "Run echo", onRun: handleComplex, result: resultComplex, disabled: !isStrk20Network || !hasEchoHelper },
+    echo: { label: "Echo round-trip test", value: "5", token: "STRK", hint: "Withdraw, call the helper contract, then refill your open note", cta: "Run echo", onRun: handleComplex, result: resultComplex, disabled: !isStrk20Network || !hasEchoHelper },
     balances: { label: "Shielded balances", value: "All", token: "tokens", hint: "Read your private pool balances", cta: "Query balances", onRun: handleBalances, result: resultBalances, disabled: !isStrk20Network },
   };
   const active = tab === "trade" || tab === "launch" ? null : CONFIG[tab];
@@ -1020,13 +1020,13 @@ export default function WalletAccountV6Tag() {
               </select>
             </div>
             <div className={styles.subLine}>
-              <span>{quote ? `Price impact ${(quote.priceImpact * 100).toFixed(2)}%` : "Private swap via AVNU — amounts hidden inside the pool"}</span>
+              <span>{quote ? `Price impact ${(quote.priceImpact * 100).toFixed(2)}%` : "Private swap via AVNU. Amounts stay hidden inside the pool."}</span>
             </div>
           </div>
 
           {!tradeTokensLoading && !tradeTokensError && tradeTokens.length === 0 && (
             <div className={styles.warn}>
-              AVNU doesn&apos;t list any tokens on Sepolia — Trade only works on Mainnet. This isn&apos;t a wallet or connection issue.
+              AVNU doesn&apos;t list any tokens on Sepolia, so Trade only works on Starknet Mainnet right now. This isn&apos;t a wallet or connection problem on your end.
             </div>
           )}
           {tradeTokensError && <div className={styles.warn}>Couldn&apos;t load tokens: {tradeTokensError}</div>}
@@ -1047,7 +1047,7 @@ export default function WalletAccountV6Tag() {
           ) : round ? (
             <>
               <div className={styles.inputBlock}>
-                <div className={styles.inputLabel}>Round #{launchRoundId.toString()} — {roundPhase}</div>
+                <div className={styles.inputLabel}>Round #{launchRoundId.toString()} · {roundPhase}</div>
                 <div className={styles.inputMain}>
                   <div className={styles.bigValue}>{fmtStrk(round.ticket_size)}</div>
                   <span className={styles.tokenPill}>
@@ -1168,7 +1168,7 @@ export default function WalletAccountV6Tag() {
 
       {!isStrk20Network && (
         <div className={styles.warn}>
-          STRK20 actions require Mainnet or Sepolia - switch your wallet network.
+          STRK20 actions require Starknet Mainnet or Sepolia. Switch your wallet&apos;s network to continue.
         </div>
       )}
 

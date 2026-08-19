@@ -1,0 +1,38 @@
+# Veyl
+
+> Veyl is a private trading and token launch terminal on Starknet. It uses the STRK20 privacy pool so that a trade or a token-launch bid cannot be traced back to the wallet that funded it. Veyl never holds user funds; every action runs through the user's own connected wallet.
+
+## What it does
+
+- **Private trading.** A user shields STRK into the STRK20 privacy pool, then trades from a wallet address that is not linkable to the funding wallet. Swaps route through AVNU.
+- **Private token launches.** New tokens can launch through a sealed-bid auction: bids are locked in as encrypted deposits and only revealed when the round settles, so no one can front-run the opening block or see the order book while bidding is open.
+- **Shielded balances and transfers.** Users can shield, unshield, and privately transfer STRK inside the pool, independent of trading or launches.
+
+## What it is not
+
+Veyl is not a launchpad and does not maintain a fixed list of tradeable tokens. It is a privacy and execution layer over Starknet: any token with liquidity on Starknet can be traded, and fair-launch auctions are one feature built on the same privacy mechanism, not the core product.
+
+## Status
+
+Veyl is in active development for the STRK20 Private Sprint hackathon (14-31 August 2026). It is currently running and testing on Starknet Sepolia before moving fully to Starknet Mainnet. The shield, unshield, and private-transfer flows and the fair-launch contract are built to work on either network. The file `strk20.json` in the repository below lists the currently deployed contracts and any live mainnet transactions; treat that file as the current source of truth over this one.
+
+## Key facts
+
+- Chain: Starknet (Mainnet: `SN_MAIN`, currently testing on Sepolia)
+- Privacy layer: STRK20, a shielded-note privacy pool protocol for Starknet
+- STRK20 mainnet pool contract: `0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a`
+- Frontend: Next.js, React, TypeScript
+- Smart contracts: Cairo (Scarb)
+- License: MIT
+- Custody model: non-custodial. Veyl never holds user funds; all actions go through the user's own wallet.
+
+## Pages
+
+- [Home](https://veyl-tau.vercel.app/): product overview, how it works, and FAQ.
+- [Dashboard](https://veyl-tau.vercel.app/dashboard): the live app. Shield, unshield, send, trade, and launch actions.
+
+## Source and documentation
+
+- [GitHub repository](https://github.com/codeswithroh/veyl): full source code, README, and `strk20.json` with current deployment status.
+- [STRK20 documentation](https://strk20-by-example.org/what-is-strk20): explains the underlying privacy pool protocol Veyl is built on.
+- [Starknet](https://www.starknet.io): the underlying blockchain.
