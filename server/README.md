@@ -36,22 +36,50 @@ Scarb 2.17.0/release profile) using the developer-approved Sepolia deployer key.
   account for the testnet phase — split this before mainnet), and `ALCHEMY_KEY`
   filled in.
 
-**Not yet callable for a real trade** — blocked on self-hosted infra:
+## Prover/discovery — resolved 2026-08-20
 
-- A viewing key is generated and set (`VEYL_BACKEND_VIEWING_KEY`) and `/health`
-  reports `configured: true`.
-- **There is no shared public STRK20 prover or discovery service.** Every
-  integrator self-hosts the Transaction Prover and Discovery Service — Docker
-  images listed in the [Privacy SDK monorepo README](https://github.com/starkware-libs/starknet-privacy#components)
-  (`ghcr.io/starkware-libs/starknet-privacy/transaction-prover`,
-  `.../discovery-service`), wired to a Starknet node (e.g. Pathfinder). An
-  earlier pass at this file guessed at hosted URLs
-  (`prover.strk20.starknet.io`, `indexer.strk20.starknet.io`) — those don't
-  resolve and were removed; `getPrivateTransfers()` now throws clearly if
-  `VEYL_PROVING_SERVICE_URL` / `VEYL_DISCOVERY_SERVICE_URL` aren't set, instead
-  of silently pointing at a dead host.
-- Standing up that infra (and then round-tripping a real Sepolia trade) is
-  deferred — tracked as its own step, not blocking the rest of Phase 2/3.
+The earlier blocker here ("no shared public STRK20 prover/discovery service, every
+integrator self-hosts") turned out to be about the *default* public internet, not
+every environment: `alpha-sepolia` — a real, shared Sepolia privacy-pool environment
+run against the same pool this service already points at
+(`0x254a6b2997ef52e9f830ce1f543f6b29768295e8d17e2267d672c552cfe0d91`) — exposes a live
+Transaction Prover and Discovery Service:
+
+```
+VEYL_PROVING_SERVICE_URL=https://transaction-prover.alpha-sepolia.sw-dev.io
+VEYL_DISCOVERY_SERVICE_URL=https://discovery-service.alpha-sepolia.sw-dev.io
+```
+
+**Verified for real, not assumed:** with these set, `transfers.build().register().execute()`
+produced a genuine STARK proof from the live prover, and — after fixing two real bugs this
+uncovered (below) — the resulting transaction landed on Sepolia and succeeded
+(tx `0x7cd3d683bc9abb1216283d63f03364a02a1313b17e7feb7f2c113e19c2866ac`). A second
+registration attempt for the same account correctly reverted with `NON_ZERO_VALUE`,
+confirming the first one genuinely persisted on-chain.
+
+**Two real bugs this surfaced and fixed, both in `getPrivateTransfers()`/the route
+handlers, not the SDK:**
+
+1. `transfers.build()...execute()` **builds and proves but does not submit on-chain.**
+   Submission is a separate `account.execute(callAndProof.call, { tip: 0n, ...proofDetails })`
+   call (per the SDK README's "proofDetails" section) — the original code treated
+   `execute()`'s return value as if it were already a submitted transaction. New
+   `submitPrivateAction()` helper does the real two-step submit + wait-for-receipt.
+2. **Proving-block timing**: the sequencer only accepts a proof whose base block is
+   ≥10 blocks old at submission time (reorg buffer, documented in the SDK README's
+   "Sequencing private transactions"). Proving against `provider.getBlockNumber()`
+   directly fails with `"proof block number too recent"` almost every time, since
+   almost no blocks pass between proving and submitting. Fixed by always passing
+   `provingBlockId: currentBlock - 10`.
+3. (Sepolia-specific, not a code bug) `register()` on this pool requires a prior
+   STRK `approve()` from the caller to the pool address — reverts with
+   `Insufficient ERC20 allowance` otherwise. Not documented anywhere I found; discovered
+   by hitting it live.
+
+**Still not done:** a real `/shadow-account/trade` round-trip (shielding funds into the
+service account, then a shadow account executing calls against some target dapp) —
+registration is the piece that was actually blocked; the trade path reuses the same
+now-fixed submission logic but hasn't been exercised with a real trade yet.
 
 ## Run it
 

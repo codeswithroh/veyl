@@ -62,7 +62,13 @@ Everything in this phase stays on what's already built — no backend yet.
 
 **Done 2026-08-17:** viewing key generated and set (`VEYL_BACKEND_VIEWING_KEY`); `/health` reports `configured: true`.
 
-**⛔ blocked 2026-08-17: no shared public STRK20 prover/discovery service.** Every integrator self-hosts the Transaction Prover and Discovery Service (Docker images in the [Privacy SDK monorepo](https://github.com/starkware-libs/starknet-privacy#components)) wired to a Starknet node. The server previously guessed at hosted URLs (`prover.strk20.starknet.io`, `indexer.strk20.starknet.io`) — those don't resolve; fixed to throw clearly instead of silently failing. Standing up that infra and completing a real Sepolia trade round-trip is deferred, at the developer's call — tracked separately, not blocking Phase 3.
+**✅ unblocked 2026-08-20.** The prover/discovery gap was real for the public internet (every integrator self-hosting, per the Privacy SDK monorepo's docs) but not for every environment: you provided `alpha-sepolia`, a real shared Sepolia privacy-pool environment run against the same pool this repo already targets, with a live Transaction Prover (`https://transaction-prover.alpha-sepolia.sw-dev.io`) and Discovery Service (`https://discovery-service.alpha-sepolia.sw-dev.io`).
+
+**Verified for real, not assumed:** `transfers.build().register().execute()` produced a genuine STARK proof and the resulting transaction landed on Sepolia and succeeded — tx [`0x7cd3d683bc9abb1216283d63f03364a02a1313b17e7feb7f2c113e19c2866ac`](https://sepolia.voyager.online/tx/0x7cd3d683bc9abb1216283d63f03364a02a1313b17e7feb7f2c113e19c2866ac). A second registration attempt for the same account correctly reverted (`NON_ZERO_VALUE`), confirming the first genuinely persisted.
+
+Getting there surfaced and fixed two real bugs in `server/src/index.ts` (not SDK bugs): (1) `transfers.build()...execute()` builds and proves but does **not** submit on-chain — a separate `account.execute(callAndProof.call, {tip: 0n, ...proofDetails})` step is required, which the original handler was missing entirely; (2) the sequencer requires a proof's base block to be ≥10 blocks old at submission time, so proving against the literal current block fails almost every time — fixed by always proving at `currentBlock - 10`. Full writeup in `server/README.md`.
+
+**Still open:** a real `/shadow-account/trade` round-trip (shield funds into the service account, then a shadow account executes calls against some target dapp). The blocker that was stopping this — no working prover/discovery — is gone; what's left is scoping and running an actual trade, which needs its own go-ahead given it moves real (testnet) funds through a new code path.
 
 This is new infrastructure, not a frontend change. **Two things gate this phase before code runs against anything real:**
 

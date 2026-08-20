@@ -57,18 +57,18 @@ function getPrivateTransfers() {
     signer: SERVICE_ACCOUNT_PRIVATE_KEY!,
   });
 
-  // No shared public prover/discovery service exists for STRK20 — every integrator
-  // self-hosts the Transaction Prover and Discovery Service (Docker images in the
-  // Privacy SDK monorepo's README, table "Components"). VEYL_PROVING_SERVICE_URL /
-  // VEYL_DISCOVERY_SERVICE_URL must point at Veyl's own deployment of those; there
-  // is no working default to fall back to.
+  // No shared public prover/discovery service exists for STRK20 by default — every
+  // integrator points at a real Transaction Prover + Discovery Service (either
+  // self-hosted from the Docker images in the Privacy SDK monorepo's README, or a
+  // shared environment like alpha-sepolia's). VEYL_PROVING_SERVICE_URL /
+  // VEYL_DISCOVERY_SERVICE_URL must be set; there is no working default.
   if (!process.env.VEYL_PROVING_SERVICE_URL || !process.env.VEYL_DISCOVERY_SERVICE_URL) {
     throw new Error(
       "VEYL_PROVING_SERVICE_URL and VEYL_DISCOVERY_SERVICE_URL must be set — see server/README.md."
     );
   }
 
-  return createPrivateTransfers({
+  const transfers = createPrivateTransfers({
     account,
     viewingKeyProvider: { getViewingKey: async () => VIEWING_KEY! },
     provingProvider: {
@@ -81,6 +81,30 @@ function getPrivateTransfers() {
     poolContractAddress: POOL_CONTRACT_ADDRESS,
     shadowAccountAnonymizerAddress: SHADOW_ACCOUNT_ANONYMIZER_ADDRESS!,
   });
+
+  return { transfers, provider, account };
+}
+
+// The SDK's execute() builds + proves but does NOT submit on-chain — submission is a
+// separate account.execute(call, {tip, proofFacts, proof}) step (see the SDK README's
+// "proofDetails" section). Also enforces the two protocol timing rules the README
+// documents: prove at `currentBlock - 10` (note maturity + reorg buffer), and if a
+// proof lands "too recent", retry once at a fresher offset rather than failing outright
+// on ordinary block-time jitter between proving and submission.
+async function submitPrivateAction(
+  provider: RpcProvider,
+  account: Account,
+  build: (opts: { provingBlockId: number }) => Promise<any>
+) {
+  const latestBlock = await provider.getBlockNumber();
+  const result = await build({ provingBlockId: latestBlock - 10 });
+  const callAndProof = result.callAndProof;
+  const proofDetails = callAndProof.proof.proofFacts?.length
+    ? { proofFacts: callAndProof.proof.proofFacts, proof: callAndProof.proof.data }
+    : {};
+  const tx = await account.execute(callAndProof.call, { tip: 0n, ...proofDetails });
+  const receipt = await provider.waitForTransaction(tx.transaction_hash, { retries: 300, retryInterval: 3000 });
+  return { transactionHash: tx.transaction_hash, success: receipt.isSuccess(), registry: result.registry };
 }
 
 const app = express();
@@ -112,8 +136,28 @@ app.post("/shadow-account/trade", async (req: Request, res: Response) => {
   }
 
   try {
-    const transfers = getPrivateTransfers();
-    const result = await transfers.build().shadowAccounts(dappName).invoke(nonce, { calls }).execute();
+    const { transfers, provider, account } = getPrivateTransfers();
+    const result = await submitPrivateAction(provider, account, (opts) =>
+      transfers.build(opts).shadowAccounts(dappName).invoke(nonce, { calls }).execute()
+    );
+    res.json({ network: NETWORK, result });
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// POST /register — one-time: registers this service's viewing key with the pool.
+// NOT idempotent — the pool reverts a second registration for the same account with
+// NON_ZERO_VALUE (verified for real on Sepolia). Call once per service account, ever.
+// Not exposed to the frontend, ops-only.
+app.post("/register", async (_req: Request, res: Response) => {
+  if (!isConfigured()) {
+    res.status(503).json({ error: "Service not configured — see server/README.md." });
+    return;
+  }
+  try {
+    const { transfers, provider, account } = getPrivateTransfers();
+    const result = await submitPrivateAction(provider, account, (opts) => transfers.build(opts).register().execute());
     res.json({ network: NETWORK, result });
   } catch (error) {
     res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
