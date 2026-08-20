@@ -68,7 +68,21 @@ Everything in this phase stays on what's already built — no backend yet.
 
 Getting there surfaced and fixed two real bugs in `server/src/index.ts` (not SDK bugs): (1) `transfers.build()...execute()` builds and proves but does **not** submit on-chain — a separate `account.execute(callAndProof.call, {tip: 0n, ...proofDetails})` step is required, which the original handler was missing entirely; (2) the sequencer requires a proof's base block to be ≥10 blocks old at submission time, so proving against the literal current block fails almost every time — fixed by always proving at `currentBlock - 10`. Full writeup in `server/README.md`.
 
-**Still open:** a real `/shadow-account/trade` round-trip (shield funds into the service account, then a shadow account executes calls against some target dapp). The blocker that was stopping this — no working prover/discovery — is gone; what's left is scoping and running an actual trade, which needs its own go-ahead given it moves real (testnet) funds through a new code path.
+**✅ Phase 2 fully verified end-to-end on Sepolia — 2026-08-20.** Register → deposit → shadow-account trade, all real:
+
+1. Deposit (shield 0.005 STRK): tx [`0x4716552a415068807f20ba596576fcacd851a89e8ca474cbabf05b91ab0dde5`](https://sepolia.voyager.online/tx/0x4716552a415068807f20ba596576fcacd851a89e8ca474cbabf05b91ab0dde5).
+2. Real `POST /shadow-account/trade` call → `{ success: true, transactionHash: "0x288cbd988ab591a06b3ec3b8d035f69c139e1a203966b64c90aa3632d490eb8" }`, shadow account `0x763ebb38022b344fcedbc806c65cb21c362ea500ba0f6fdd228186df5c0151c`.
+3. **Unlinkability confirmed via `starknet_traceTransaction`, not assumed**: the shadow account is a fresh contract, deployed by the anonymizer, and it — not the service account — is the `caller_address` on the dapp call it executes. The service account never appears as the direct caller.
+
+Getting there surfaced and fixed several real things, all in `server/src/index.ts` (not SDK bugs) — full detail in `server/README.md`:
+
+- `transfers.build()...execute()` builds and proves but does **not** submit on-chain — needs a separate `account.execute(callAndProof.call, {tip: 0n, ...proofDetails})` step.
+- Proofs need `provingBlockId: currentBlock - 10` (sequencer's reorg-buffer rule) or submission fails almost every time.
+- A bare `shadowAccounts(dappName).invoke(nonce, {calls})` reverts with `NO_REPLAY_PROTECTION` — needs a paired settlement action (`.with(token).withdraw(...)`), which `/shadow-account/trade` now builds automatically from a `fundAmount` request parameter.
+- `transfers.build()` needs `autoRegister`/`autoSetup`/`autoDiscover` for an account without a manually-opened channel — found by reading the Privacy SDK monorepo's own `demo/` reference app, not the SDK README.
+- `.transfer({amount: Open})` needs a pre-opened channel even to self; `.withdraw(...)` doesn't.
+
+**Remaining before mainnet:** split the deployer/governance-admin key from the day-to-day service signer (currently the same account for the testnet phase), move the viewing key to a real secrets manager, then a separate, explicit mainnet deployment.
 
 This is new infrastructure, not a frontend change. **Two things gate this phase before code runs against anything real:**
 

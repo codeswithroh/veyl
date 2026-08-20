@@ -76,10 +76,64 @@ handlers, not the SDK:**
    `Insufficient ERC20 allowance` otherwise. Not documented anywhere I found; discovered
    by hitting it live.
 
-**Still not done:** a real `/shadow-account/trade` round-trip (shielding funds into the
-service account, then a shadow account executing calls against some target dapp) —
-registration is the piece that was actually blocked; the trade path reuses the same
-now-fixed submission logic but hasn't been exercised with a real trade yet.
+## Full round-trip verified for real — 2026-08-20
+
+A complete shield → shadow-account trade → collect round-trip, on Sepolia, with proof:
+
+1. **Deposit** — shielded 0.01 STRK for the service account: tx
+   [`0x719c8087ffe6392a68886459446b9ed6b7f00eea8dd96996c1d9b22a9b7ac79`](https://sepolia.voyager.online/tx/0x719c8087ffe6392a68886459446b9ed6b7f00eea8dd96996c1d9b22a9b7ac79).
+2. **Shadow-account trade** — withdrew 0.001 STRK to the deterministic (pre-deploy)
+   address of the `veyl-demo`/nonce-0 shadow account, had it execute a real signed call
+   (`STRK.approve`) as itself, then collected the balance back: tx
+   [`0x220d66efeeb75296487374bebcfd22ae1da0b8eab8606e3348a86e221295b0f`](https://sepolia.voyager.online/tx/0x220d66efeeb75296487374bebcfd22ae1da0b8eab8606e3348a86e221295b0f).
+3. **Confirmed via `starknet_traceTransaction`, not assumed:** the shadow account
+   `0x7b86fa9404e407896436d772397eb60af3a1007e989994c39d64055a5ee4a76` is deployed
+   fresh (constructor call from the anonymizer), and **it** — not the service account —
+   is the `caller_address` on the `STRK.approve` call. The service account never appears
+   as the direct caller of the dapp call at any point in the trace.
+
+**Three more real things this surfaced, on top of the two bugs above:**
+
+1. **A bare `shadowAccounts(dappName).invoke(nonce, {calls})` alone reverts with
+   `NO_REPLAY_PROTECTION`** — the pool requires at least one "write-once" client action
+   per transaction (a fresh note/channel write), and `ComputeAndInvoke` alone isn't one.
+   Pairing it with a `.with(token).withdraw(...)` settlement (as the SDK's own `invoke()`
+   docstring hints — "the caller can add the open-note creation ... and `.execute()`")
+   satisfies it.
+2. **`.transfer({ amount: Open })` needs a pre-opened private channel, even to self** —
+   `.withdraw(...)` goes to a public address instead and needs no channel, which is what
+   both the pre-fund and the final collect step use here.
+3. **`transfers.build()` needs `autoRegister`, `autoSetup`, and `autoDiscover` to work
+   for an account that hasn't manually opened its own channel** — without them, even a
+   plain self-deposit reverts with `Channel not found for recipient`. Found by reading
+   the Privacy SDK monorepo's own `demo/` reference app
+   (`demo/src/hooks/useTransactionBuilder.ts`), not documented in the SDK README itself.
+
+**`/shadow-account/trade` itself is now fixed to do this pairing internally** — it takes
+`fundAmount` (STRK smallest units) and an optional `settleRecipient`, looks up the shadow
+account's deterministic address via `get_shadow_accounts`, and wires the
+withdraw-fund → invoke → withdraw-collect sequence automatically. **Verified against the
+real endpoint, not just the standalone script:** `POST /shadow-account/trade` with
+`{ dappName: "veyl-demo", nonce: 1, fundAmount: "1000000000000000", calls: [...] }`
+returned `{ success: true, transactionHash: "0x288cbd988ab591a06b3ec3b8d035f69c139e1a203966b64c90aa3632d490eb8" }`
+against a fresh shadow account
+(`0x763ebb38022b344fcedbc806c65cb21c362ea500ba0f6fdd228186df5c0151c`).
+
+One more real thing hit along the way, worth knowing: **a self-`surplusTo` needs
+`withdraw: false` (private note) once a self-channel already exists, and
+`withdraw: true` (public) only works as a substitute for replay protection on the
+*very first* deposit** (when `autoSetup` itself opens the channel, which counts as the
+write-once action). A second deposit with `withdraw: true` and no other fresh channel
+activity reverts with `NO_REPLAY_PROTECTION` — there's nothing "write-once" left to
+anchor it. Not a bug in this repo's code, just a real protocol detail to design around
+in whatever eventually calls `/register`/deposit logic beyond this one-off testing.
+
+**Phase 2 is now fully verified end-to-end on Sepolia:** register → deposit → shadow-account
+trade, all through real infra, with the shadow account's identity confirmed unlinkable via
+`starknet_traceTransaction` (see above). What's left before any of this is product-ready:
+mainnet deployment (separate, explicit step per the testnet-before-mainnet rule), splitting
+the deployer/governance-admin key from the day-to-day service signer, and moving the viewing
+key to a real secrets manager.
 
 ## Run it
 

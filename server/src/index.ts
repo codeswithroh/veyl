@@ -1,6 +1,6 @@
 import express from "express";
 import type { Request, Response } from "express";
-import { Account, RpcProvider, constants, type Call } from "starknet";
+import { Account, Contract, RpcProvider, constants, type Call } from "starknet";
 import { createPrivateTransfers } from "@starkware-libs/starknet-privacy-sdk";
 
 // Veyl shadow-account service — the one component in this stack allowed to hold
@@ -36,6 +36,42 @@ const RPC_URL =
     : `https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/${ALCHEMY_KEY ?? ""}`;
 
 const CHAIN_ID = NETWORK === "mainnet" ? constants.StarknetChainId.SN_MAIN : constants.StarknetChainId.SN_SEPOLIA;
+
+// Same STRK address the frontend uses (src/utils/constants.ts addrSTRK) — the fee/fund
+// token for shadow-account trades. Real per-token support is future work; one token
+// keeps this first pass simple.
+const STRK_TOKEN = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+
+// Minimal ABI fragment for the one read this service needs from the anonymizer: the
+// deterministic (pre-deploy) address of a shadow account, so we know where to withdraw
+// its funding to before invoke() runs.
+const SHADOW_ACCOUNT_ANONYMIZER_ABI = [
+  {
+    type: "struct",
+    name: "shadow_account_anonymizer::shadow_account_anonymizer::ShadowAccountInfo",
+    members: [
+      { name: "nonce", type: "core::integer::u64" },
+      { name: "address", type: "core::starknet::contract_address::ContractAddress" },
+      { name: "is_deployed", type: "core::bool" },
+    ],
+  },
+  {
+    type: "function",
+    name: "get_shadow_accounts",
+    inputs: [
+      { name: "partial_commitment", type: "core::felt252" },
+      { name: "start_nonce", type: "core::integer::u64" },
+      { name: "end_nonce", type: "core::integer::u64" },
+      { name: "until_undeployed", type: "core::bool" },
+    ],
+    outputs: [
+      {
+        type: "core::array::Span::<shadow_account_anonymizer::shadow_account_anonymizer::ShadowAccountInfo>",
+      },
+    ],
+    state_mutability: "view",
+  },
+] as const;
 
 function isConfigured(): boolean {
   return Boolean(
@@ -115,9 +151,17 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 // POST /shadow-account/trade
-// Body: { dappName: string, nonce: number, calls: Call[] }
-// Queues a ComputeAndInvoke against the deployed ShadowAccountAnonymizer, executing
-// `calls` from a fresh, unlinkable shadow account rather than the funding wallet.
+// Body: { dappName: string, nonce: number, calls: Call[], fundAmount: string, settleRecipient?: string }
+// `fundAmount` (STRK smallest units, decimal string) is withdrawn from the service
+// account's shielded balance to the shadow account before `calls` runs, then collected
+// back in full afterward — the same amount both times, so no other tokens ever pass
+// through the shadow account by design. `settleRecipient` defaults to the service
+// account's own public address; pass a different one to withdraw the result elsewhere.
+//
+// A bare ComputeAndInvoke (just `calls`, no funding/settlement) reverts with
+// NO_REPLAY_PROTECTION — the pool requires at least one "write-once" action per
+// transaction, which the withdraw pairing here provides. Verified for real on Sepolia,
+// see server/README.md "Full round-trip verified for real".
 app.post("/shadow-account/trade", async (req: Request, res: Response) => {
   if (!isConfigured()) {
     res.status(503).json({
@@ -129,18 +173,69 @@ app.post("/shadow-account/trade", async (req: Request, res: Response) => {
     return;
   }
 
-  const { dappName, nonce, calls } = req.body as { dappName?: string; nonce?: number; calls?: Call[] };
-  if (!dappName || nonce === undefined || !Array.isArray(calls) || calls.length === 0) {
-    res.status(400).json({ error: "Body must include { dappName: string, nonce: number, calls: Call[] }." });
+  const { dappName, nonce, calls, fundAmount, settleRecipient } = req.body as {
+    dappName?: string;
+    nonce?: number;
+    calls?: Call[];
+    fundAmount?: string;
+    settleRecipient?: string;
+  };
+  if (!dappName || nonce === undefined || !Array.isArray(calls) || calls.length === 0 || !fundAmount) {
+    res.status(400).json({
+      error:
+        "Body must include { dappName: string, nonce: number, calls: Call[], fundAmount: string } " +
+        "(fundAmount = STRK smallest units, decimal string).",
+    });
+    return;
+  }
+  let fundAmountBigint: bigint;
+  try {
+    fundAmountBigint = BigInt(fundAmount);
+    if (fundAmountBigint <= 0n) throw new Error("must be positive");
+  } catch {
+    res.status(400).json({ error: "fundAmount must be a positive integer decimal string." });
     return;
   }
 
   try {
     const { transfers, provider, account } = getPrivateTransfers();
+
+    const shadowBuilder = transfers.build().shadowAccounts(dappName);
+    const partialCommitment = await shadowBuilder.partialCommitment();
+    const anonymizer = new Contract({
+      abi: SHADOW_ACCOUNT_ANONYMIZER_ABI as unknown as any,
+      address: SHADOW_ACCOUNT_ANONYMIZER_ADDRESS!,
+      providerOrAccount: provider,
+    });
+    const accounts = await anonymizer.call("get_shadow_accounts", [
+      "0x" + partialCommitment.toString(16),
+      nonce,
+      Number(nonce) + 1,
+      false,
+    ]);
+    const shadowAddress = "0x" + BigInt((accounts as any[])[0].address).toString(16);
+
+    const settleTo = settleRecipient ?? SERVICE_ACCOUNT_ADDRESS!;
     const result = await submitPrivateAction(provider, account, (opts) =>
-      transfers.build(opts).shadowAccounts(dappName).invoke(nonce, { calls }).execute()
+      transfers
+        .build({
+          ...opts,
+          autoRegister: true,
+          autoSetup: true,
+          autoDiscover: { notes: "refresh", channels: "refresh" },
+          autoSelectNotes: "naive",
+        })
+        .surplusTo(SERVICE_ACCOUNT_ADDRESS!, true)
+        .with(STRK_TOKEN)
+        .withdraw({ recipient: shadowAddress, amount: fundAmountBigint })
+        .done()
+        .shadowAccounts(dappName)
+        .invoke(nonce, { calls, collectPolicy: { type: "exact", amount: fundAmountBigint } })
+        .with(STRK_TOKEN)
+        .withdraw({ recipient: settleTo, amount: fundAmountBigint })
+        .execute()
     );
-    res.json({ network: NETWORK, result });
+    res.json({ network: NETWORK, shadowAddress, result });
   } catch (error) {
     res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
   }
