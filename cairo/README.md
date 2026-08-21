@@ -91,22 +91,39 @@ pool — same as it would in production.
 **What's verified:** the contract is live on-chain, and `create_round` (admin-only, moves no
 funds) was called for real and read back correctly via `get_round`.
 
-**What isn't yet verified:** a full `commit → reveal → finalize → claim` round through the *real*
-privacy pool. `commit`/`claim` only accept calls from `pool_address` — this was believed blocked
-on self-hosted prover/discovery infra, but that blocker turned out to be resolved (see
-[server/README.md](../server/README.md) "Prover/discovery — resolved 2026-08-20": a real shared
-Sepolia environment, `alpha-sepolia`, exposes a live Transaction Prover + Discovery Service against
-this exact pool). What's still missing is wiring — the Privacy SDK's `InvokeExternal` client action
-(the same mechanism the Echo helper and this contract's own `privacy_invoke` are designed around)
-hasn't been exercised against `FairLaunchAnonymizer` specifically yet, only against
-`ShadowAccountAnonymizer`'s `ComputeAndInvoke`. The commit/reveal/finalize/claim *logic* is
-verified by the `snforge` unit tests above (which exercise the exact same code paths against a
-mock pool caller); a live pool-mediated round is the remaining gap, and it's now a scoping task,
-not an infra blocker.
+## Live pool-mediated round — 3 of 4 steps verified for real, 2026-08-21
+
+Ran an actual round through the real Sepolia privacy pool (not the `snforge` mock-caller
+tests) via the SDK's top-level `PrivateTransfersBuilder.invoke(callBuilder)` — the
+`InvokeExternal` client action, the general mechanism `commit`/`claim` are built around.
+Round 1, `launch_token` = a fresh `VeylDemoToken` instance deployed for this test (own
+supply, doesn't touch any shared account), `price`/`total_supply`/`ticket_size` = small
+round numbers for a cheap real test.
+
+- **`commit`** — real, via `.with(STRK).withdraw(...).invoke(() => ({contractAddress, calldata}))`:
+  tx [`0x74402f9964dc1746836a5e17a047d8ecf1c9cff2b7f0e41fbbf3d4ef168216c`](https://sepolia.voyager.online/tx/0x74402f9964dc1746836a5e17a047d8ecf1c9cff2b7f0e41fbbf3d4ef168216c).
+  **First confirmation that `InvokeExternal` works against this contract at all** — the demo
+  app reference only exercises it for a single-token swap, not this shape.
+- **`reveal`** — plain call, real: tx
+  [`0x9c27440f184de566e7717e658f72481ccea0edf39c7ae08235d69443763b94`](https://sepolia.voyager.online/tx/0x9c27440f184de566e7717e658f72481ccea0edf39c7ae08235d69443763b94).
+- **`finalize`** — real, correctly computed a full fill (`clearing_num == clearing_den == 1`,
+  one ticket exactly covering `total_supply * price`): tx
+  [`0x6a7667ace4fb7161eea8d182b2f9f4cf83914bbe871ee0f52b9a0522785b8de`](https://sepolia.voyager.online/tx/0x6a7667ace4fb7161eea8d182b2f9f4cf83914bbe871ee0f52b9a0522785b8de).
+- **`claim` — not yet successful.** Built via two chained `.with(token).transfer({recipient: self, amount: Open}).done()`
+  blocks (one per token, per the demo app's own real usage pattern in
+  `demo/src/hooks/useTransactions.ts`), then `.invoke((args) => ...)` reading both resolved
+  `openNotes`. Reverts with `ZERO_AMOUNT` from inside the **account's own multicall**
+  (not the pool, not this contract) — plausibly specific to a full-fill round, where the
+  STRK-refund side of `claim`'s return is *exactly* zero, and something in how that open
+  note gets assembled trips a zero-value guard before the account even submits. Untested:
+  whether an oversubscribed round (nonzero refund on both sides) claims cleanly — that would
+  confirm or rule out this hypothesis. Left here rather than guessing further at more real
+  transactions without a documented reference for this exact multi-open-note claim shape.
 
 ## Not yet done
 
+- Diagnose the `claim` `ZERO_AMOUNT` revert (see above) — most direct path is trying a
+  claim on an *oversubscribed* round instead of a full-fill one.
 - A real audit before any mainnet round.
-- A live pool-mediated Sepolia round (see above — no longer infra-blocked, just not yet run).
 - Mainnet deployment — separate step, needs its own explicit go-ahead, only after a real
-  pool-mediated Sepolia round has actually settled.
+  pool-mediated Sepolia round has actually settled end to end, including a successful claim.
