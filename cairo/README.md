@@ -73,8 +73,10 @@ Artifacts land in `target/dev/` — `strk20_invoke_helper_FairLaunchAnonymizer.c
 
 ## Tests
 
-`snforge` unit tests cover full-fill value conservation and a forfeited (never-revealed) bid
-correctly staying escrowed and unclaimable — plan §8's two explicit requirements. Run:
+`snforge` unit tests cover full-fill value conservation, a forfeited (never-revealed) bid
+correctly staying escrowed and unclaimable (plan §8's two explicit requirements), and
+oversubscribed pro-rata allocation (two bidders, `total_raised > raise_cap`, exercising the
+`clearing_num`/`clearing_den` branch in `finalize`). Run:
 
 ```bash
 scarb build && snforge test
@@ -90,22 +92,21 @@ pool — same as it would in production.
 funds) was called for real and read back correctly via `get_round`.
 
 **What isn't yet verified:** a full `commit → reveal → finalize → claim` round through the *real*
-privacy pool. `commit`/`claim` only accept calls from `pool_address`, and reaching that path for
-real requires the same self-hosted Transaction Prover + Discovery Service infra that
-[server/README.md](../server/README.md)'s Phase 2 verification is blocked on (no shared public
-STRK20 prover/discovery service exists — every integrator self-hosts). Until that infra exists,
-the commit/reveal/finalize/claim *logic* is verified by the `snforge` unit tests above (which
-exercise the exact same code paths against a mock pool caller), not by a live pool-mediated round.
-
-## Oversubscription pro-rata math — not yet covered by a test
-
-The `snforge` suite above covers full-fill and forfeiture; an oversubscribed round (multiple
-revealed tickets exceeding `total_supply * price`, exercising the `clearing_num`/`clearing_den`
-branch in `finalize`) doesn't have a test yet. Worth adding before a real launch round.
+privacy pool. `commit`/`claim` only accept calls from `pool_address` — this was believed blocked
+on self-hosted prover/discovery infra, but that blocker turned out to be resolved (see
+[server/README.md](../server/README.md) "Prover/discovery — resolved 2026-08-20": a real shared
+Sepolia environment, `alpha-sepolia`, exposes a live Transaction Prover + Discovery Service against
+this exact pool). What's still missing is wiring — the Privacy SDK's `InvokeExternal` client action
+(the same mechanism the Echo helper and this contract's own `privacy_invoke` are designed around)
+hasn't been exercised against `FairLaunchAnonymizer` specifically yet, only against
+`ShadowAccountAnonymizer`'s `ComputeAndInvoke`. The commit/reveal/finalize/claim *logic* is
+verified by the `snforge` unit tests above (which exercise the exact same code paths against a
+mock pool caller); a live pool-mediated round is the remaining gap, and it's now a scoping task,
+not an infra blocker.
 
 ## Not yet done
 
-- Oversubscription pro-rata test (see above).
 - A real audit before any mainnet round.
+- A live pool-mediated Sepolia round (see above — no longer infra-blocked, just not yet run).
 - Mainnet deployment — separate step, needs its own explicit go-ahead, only after a real
   pool-mediated Sepolia round has actually settled.

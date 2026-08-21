@@ -145,3 +145,85 @@ fn test_unrevealed_bid_forfeits_and_cannot_claim() {
     // The ticket stays escrowed in the contract — forfeited, not returned.
     assert(strk.balance_of(anonymizer.contract_address) == 5000, 'forfeited ticket stays escrowed');
 }
+
+#[test]
+fn test_oversubscribed_round_pro_rata_allocation() {
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+    launch.mint(anonymizer.contract_address, 1000);
+
+    // raise_cap = total_supply * price = 10000. Two 6000-STRK tickets both reveal, so
+    // total_raised = 12000 > raise_cap — the round is oversubscribed and must clear
+    // pro-rata rather than fully filling both bidders.
+    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
+    let round_id = anonymizer
+        .create_round(
+            launch_token: launch.contract_address,
+            price: 10,
+            total_supply: 1000,
+            ticket_size: 6000,
+            commit_end: 100,
+            reveal_end: 200,
+        );
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    let bid_a: felt252 = 'bid_a';
+    let salt_a: felt252 = 'salt_a';
+    let commitment_a = poseidon_hash_span(array![salt_a].span());
+    let bid_b: felt252 = 'bid_b';
+    let salt_b: felt252 = 'salt_b';
+    let commitment_b = poseidon_hash_span(array![salt_b].span());
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 50);
+    escrow_ticket(strk, anonymizer.contract_address, 6000);
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer.privacy_invoke(round_id, bid_a, FairLaunchAction::Commit(commitment_a));
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    escrow_ticket(strk, anonymizer.contract_address, 6000);
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer.privacy_invoke(round_id, bid_b, FairLaunchAction::Commit(commitment_b));
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 150);
+    anonymizer.reveal(round_id, bid_a, salt_a);
+    anonymizer.reveal(round_id, bid_b, salt_b);
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 250);
+    anonymizer.finalize(round_id);
+    let round = anonymizer.get_round(round_id);
+    assert(round.finalized, 'should be finalized');
+    assert(round.clearing_num == 10000, 'wrong clearing num');
+    assert(round.clearing_den == 12000, 'wrong clearing den');
+
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    let deposits_a = anonymizer
+        .privacy_invoke(round_id, bid_a, FairLaunchAction::Claim(('a_token', 'a_strk')));
+    stop_cheat_caller_address(anonymizer.contract_address);
+    let token_a = *deposits_a.at(0);
+    let strk_a = *deposits_a.at(1);
+    // strk_alloc = 6000 * 10000 / 12000 = 5000 -> tokens_out = 5000 / 10 = 500,
+    // refund = 6000 - 500*10 = 1000.
+    assert(token_a.amount == 500, 'bidder a wrong tokens');
+    assert(strk_a.amount == 1000, 'bidder a wrong refund');
+
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    let deposits_b = anonymizer
+        .privacy_invoke(round_id, bid_b, FairLaunchAction::Claim(('b_token', 'b_strk')));
+    stop_cheat_caller_address(anonymizer.contract_address);
+    let token_b = *deposits_b.at(0);
+    let strk_b = *deposits_b.at(1);
+    assert(token_b.amount == 500, 'bidder b wrong tokens');
+    assert(strk_b.amount == 1000, 'bidder b wrong refund');
+
+    // Balance-sheet invariants: total tokens allocated never exceeds total_supply, and
+    // total STRK actually kept (tickets minus refunds) never exceeds raise_cap — the
+    // core "nets to zero" property the plan requires for the settlement math.
+    assert(token_a.amount + token_b.amount == 1000, 'total tokens mismatch');
+    let total_refund = strk_a.amount + strk_b.amount;
+    assert(12000 - total_refund == 10000, 'total collected mismatch');
+
+    assert(anonymizer.is_claimed(round_id, bid_a), 'a should be claimed');
+    assert(anonymizer.is_claimed(round_id, bid_b), 'b should be claimed');
+}
