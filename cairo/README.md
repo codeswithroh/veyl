@@ -58,9 +58,14 @@ contract did exactly that — see [`address.md`](address.md)'s superseded entry)
   two of these explicitly (`token_note_id`, `strk_note_id`) for that transaction's two
   pre-created open notes — never `bid_id`.
 
-`claim` always returns exactly two `OpenNoteDeposit` entries (one per pre-created open note),
-using `0` for whichever side has nothing to pay, so the returned array always matches what the
-caller set up upfront.
+`claim` returns one `OpenNoteDeposit` entry per **nonzero** leg only — never a zero-amount
+entry. The privacy pool refuses to fund a zero-value open note (a full-fill round where the
+STRK refund lands on exactly zero used to revert the whole claim with `ZERO_AMOUNT`, from
+inside the caller's own multicall, before the pool or this contract were even reached — see
+"Live pool-mediated round" below). Callers must mirror this: compute `tokens_out`/`refund`
+from the finalized round's `ticket_size`/`price`/`clearing_num`/`clearing_den` *before*
+calling `claim`, only pre-create an open note for the leg(s) that will be nonzero, and pass
+`0` as the note id for whichever leg they're skipping.
 
 ## Build
 
@@ -109,21 +114,30 @@ round numbers for a cheap real test.
 - **`finalize`** — real, correctly computed a full fill (`clearing_num == clearing_den == 1`,
   one ticket exactly covering `total_supply * price`): tx
   [`0x6a7667ace4fb7161eea8d182b2f9f4cf83914bbe871ee0f52b9a0522785b8de`](https://sepolia.voyager.online/tx/0x6a7667ace4fb7161eea8d182b2f9f4cf83914bbe871ee0f52b9a0522785b8de).
-- **`claim` — not yet successful.** Built via two chained `.with(token).transfer({recipient: self, amount: Open}).done()`
-  blocks (one per token, per the demo app's own real usage pattern in
-  `demo/src/hooks/useTransactions.ts`), then `.invoke((args) => ...)` reading both resolved
-  `openNotes`. Reverts with `ZERO_AMOUNT` from inside the **account's own multicall**
-  (not the pool, not this contract) — plausibly specific to a full-fill round, where the
-  STRK-refund side of `claim`'s return is *exactly* zero, and something in how that open
-  note gets assembled trips a zero-value guard before the account even submits. Untested:
-  whether an oversubscribed round (nonzero refund on both sides) claims cleanly — that would
-  confirm or rule out this hypothesis. Left here rather than guessing further at more real
-  transactions without a documented reference for this exact multi-open-note claim shape.
+- **`claim` — was reverting, root-caused and fixed (2026-08-24).** Built via two chained
+  `.with(token).transfer({recipient: self, amount: Open}).done()` blocks (one per token, per
+  the demo app's own real usage pattern in `demo/src/hooks/useTransactions.ts`), then
+  `.invoke((args) => ...)` reading both resolved `openNotes`. Reverted with `ZERO_AMOUNT`
+  from inside the **account's own multicall** (not the pool, not this contract). Root cause
+  confirmed: this was a full-fill round (`ticket_size` divided evenly by `price`), so the
+  STRK-refund side of `claim`'s return was *exactly* zero — and asking the account to open a
+  zero-value note for that leg trips the wallet's own zero-value guard before it ever submits.
+  `_claim` unconditionally returned both legs (with `0` standing in for "nothing to pay"),
+  which meant the caller always pre-created two open notes even when only one would end up
+  funded. Fixed by making `_claim` omit the zero leg from its returned span entirely instead
+  of returning a zero-amount entry, and updating the frontend (`WalletAccountV6Tag.tsx`) to
+  compute `tokens_out`/`refund` from the finalized round before calling claim, so it only
+  pre-creates an open note for the leg(s) that will actually be nonzero. Covered by two new
+  `snforge` tests (`test_full_fill_single_bidder_conserves_value` now asserts a single
+  deposit; `test_claim_omits_zero_token_leg_when_ticket_smaller_than_price` covers the
+  opposite zero leg). **Not yet re-verified against the real Sepolia pool** — the original
+  failing transaction predates this fix; a fresh on-chain claim is still needed to confirm.
 
 ## Not yet done
 
-- Diagnose the `claim` `ZERO_AMOUNT` revert (see above) — most direct path is trying a
-  claim on an *oversubscribed* round instead of a full-fill one.
+- Re-run a real Sepolia claim against the fixed contract (redeploy required — the fix changes
+  `_claim`'s bytecode, so the currently-deployed class hash in `address.md` still has the bug)
+  to confirm the `ZERO_AMOUNT` fix holds against the actual pool, not just `snforge` mocks.
 - A real audit before any mainnet round.
 - Mainnet deployment — separate step, needs its own explicit go-ahead, only after a real
   pool-mediated Sepolia round has actually settled end to end, including a successful claim.

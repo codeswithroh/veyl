@@ -48,8 +48,10 @@ pub struct OpenNoteDeposit {
 #[derive(Serde, Copy, Drop, PartialEq, Debug)]
 pub enum FairLaunchAction {
     Commit: felt252, // commitment = hash(salt) for this bid_id
-    // (token_note_id, strk_note_id) — this transaction's two freshly-created open notes
-    // (${openNoteIds[0]}, ${openNoteIds[1]}), NOT the bid_id from commit.
+    // (token_note_id, strk_note_id) — this transaction's freshly-created open note(s)
+    // (${openNoteIds[N]}), NOT the bid_id from commit. Pass `0` for whichever leg the
+    // caller doesn't expect a payout on (see `_claim` — a zero-amount leg is never
+    // deposited into, so callers must not pre-create an open note for it either).
     Claim: (felt252, felt252),
 }
 
@@ -400,10 +402,14 @@ mod FairLaunchAnonymizer {
         }
 
         // `token_note_id` / `strk_note_id` are THIS transaction's freshly-created open
-        // notes (the wallet's ${openNoteIds[0]}/${openNoteIds[1]}), not `bid_id` — see the
-        // module-level note on the two id spaces. Always returns exactly two deposits (one
-        // per pre-created open note), zero-amount where there's nothing to pay, so the
-        // returned array always matches the two open notes the caller created upfront.
+        // notes (the wallet's ${openNoteIds[N]}), not `bid_id` — see the module-level note
+        // on the two id spaces. Returns one deposit per *nonzero* leg only: a zero-amount
+        // open note isn't a valid note in the privacy pool (it reverts with ZERO_AMOUNT
+        // when the caller's own multicall tries to fund one), so a full-fill round with an
+        // exact refund of 0 must not be offered a zero-value STRK deposit at all. Callers
+        // must mirror this: only pre-create (and pass a real id for) the leg(s) that will
+        // actually be nonzero, computed from the same `ticket_size`/`price`/`clearing_num`/
+        // `clearing_den` math off `get_round` before submitting.
         fn _claim(
             ref self: ContractState,
             round_id: u64,
@@ -434,24 +440,28 @@ mod FairLaunchAnonymizer {
             self.emit(Claimed { round_id, bid_id, tokens_out, refund });
 
             let pool = self.pool_address.read();
-            if refund != 0 {
-                let strk = IErc20Dispatcher { contract_address: self.strk_token.read() };
-                strk.approve(pool, refund.into());
-            }
+            let mut deposits = array![];
             if tokens_out != 0 {
                 let launch = IErc20Dispatcher { contract_address: round.launch_token };
                 launch.approve(pool, tokens_out.into());
+                deposits
+                    .append(
+                        OpenNoteDeposit {
+                            note_id: token_note_id, token: round.launch_token, amount: tokens_out,
+                        },
+                    );
             }
-
-            array![
-                OpenNoteDeposit {
-                    note_id: token_note_id, token: round.launch_token, amount: tokens_out,
-                },
-                OpenNoteDeposit {
-                    note_id: strk_note_id, token: self.strk_token.read(), amount: refund,
-                },
-            ]
-                .span()
+            if refund != 0 {
+                let strk = IErc20Dispatcher { contract_address: self.strk_token.read() };
+                strk.approve(pool, refund.into());
+                deposits
+                    .append(
+                        OpenNoteDeposit {
+                            note_id: strk_note_id, token: self.strk_token.read(), amount: refund,
+                        },
+                    );
+            }
+            deposits.span()
         }
     }
 }

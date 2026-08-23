@@ -91,21 +91,72 @@ fn test_full_fill_single_bidder_conserves_value() {
         .privacy_invoke(round_id, bid_id, FairLaunchAction::Claim((token_note_id, strk_note_id)));
     stop_cheat_caller_address(anonymizer.contract_address);
 
-    // Full fill, no dust: two deposits (always one per pre-created open note), 1000
-    // launch_token, zero STRK refund.
-    assert(deposits.len() == 2, 'expected exactly two deposits');
+    // Full fill, no dust: exactly one deposit (the launch_token leg) — the STRK refund is
+    // exactly zero, and a zero-amount leg must never be offered as an open note (the real
+    // pool rejects funding a zero-value note), so it's omitted entirely rather than
+    // returned as a zero-amount entry.
+    assert(deposits.len() == 1, 'expected exactly one deposit');
     let token_deposit = *deposits.at(0);
     assert(token_deposit.note_id == token_note_id, 'wrong token note id');
     assert(token_deposit.token == launch.contract_address, 'wrong token');
     assert(token_deposit.amount == 1000, 'wrong amount');
-    let strk_deposit = *deposits.at(1);
-    assert(strk_deposit.note_id == strk_note_id, 'wrong strk note id');
-    assert(strk_deposit.amount == 0, 'expected zero refund');
     assert(anonymizer.is_claimed(round_id, bid_id), 'should be claimed');
 
     // Value conservation: every STRK that went in either stays escrowed or was approved back
     // out; the anonymizer never creates or destroys value.
     assert(strk.balance_of(anonymizer.contract_address) == 10000, 'strk stays escrowed, no refund');
+}
+
+#[test]
+fn test_claim_omits_zero_token_leg_when_ticket_smaller_than_price() {
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+    launch.mint(anonymizer.contract_address, 1000);
+
+    // ticket_size (5) < price (10) -> tokens_out rounds down to 0, so the whole ticket
+    // comes back as a refund. The token leg must be omitted entirely, not returned as a
+    // zero-amount deposit — mirrors the full-fill-with-zero-refund case but on the other leg.
+    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
+    let round_id = anonymizer
+        .create_round(
+            launch_token: launch.contract_address,
+            price: 10,
+            total_supply: 1000,
+            ticket_size: 5,
+            commit_end: 100,
+            reveal_end: 200,
+        );
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    let bid_id: felt252 = 'bid_small';
+    let salt: felt252 = 'salt_small';
+    let commitment = poseidon_hash_span(array![salt].span());
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 50);
+    escrow_ticket(strk, anonymizer.contract_address, 5);
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer.privacy_invoke(round_id, bid_id, FairLaunchAction::Commit(commitment));
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 150);
+    anonymizer.reveal(round_id, bid_id, salt);
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 250);
+    anonymizer.finalize(round_id);
+    let round = anonymizer.get_round(round_id);
+    assert(round.clearing_num == round.clearing_den, 'full fill: ratio should be 1');
+
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    let deposits = anonymizer
+        .privacy_invoke(round_id, bid_id, FairLaunchAction::Claim((0, 'open_note_strk')));
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    assert(deposits.len() == 1, 'expected exactly one deposit');
+    let strk_deposit = *deposits.at(0);
+    assert(strk_deposit.note_id == 'open_note_strk', 'wrong strk note id');
+    assert(strk_deposit.token == strk.contract_address, 'wrong token');
+    assert(strk_deposit.amount == 5, 'expected full refund');
 }
 
 #[test]

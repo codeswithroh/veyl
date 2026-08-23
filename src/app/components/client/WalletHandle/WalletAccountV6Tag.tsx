@@ -586,32 +586,48 @@ export default function WalletAccountV6Tag() {
     }
   };
 
-  // Claim: creates two fresh open notes (token + STRK refund) via the wallet's
-  // ${openNoteIds[N]} placeholders, then invokes Claim with those two ids explicitly -
-  // NOT bid_id, which only identifies this bidder's state inside the contract.
+  // Claim: creates a fresh open note per *nonzero* leg (token and/or STRK refund) via the
+  // wallet's ${openNoteIds[N]} placeholders, then invokes Claim with those ids - NOT bid_id,
+  // which only identifies this bidder's state inside the contract. A leg that resolves to
+  // zero (e.g. a full-fill round has exactly zero STRK refund) must not get an open note at
+  // all: the pool rejects funding a zero-amount note, so the contract omits that leg from
+  // its returned deposits and the caller must mirror that by never asking for one - compute
+  // the same tokens_out/refund math the contract does, from the finalized round's clearing
+  // ratio, before deciding which open notes to create.
   const handleClaim = async () => {
     setResultClaim(null);
     if (!connectedAddress || !round || !bidCreds) {
       setResultClaim(errorResult("No revealed bid to claim from this wallet."));
       return;
     }
+    if (!round.finalized || round.clearing_den === 0n) {
+      setResultClaim(errorResult("Round isn't finalized yet."));
+      return;
+    }
     setClaiming(true);
     try {
-      const actions: WALLET_API.STRK20_ACTION[] = [
-        { type: "transfer", token: round.launch_token, amount: "OPEN", recipient: connectedAddress },
-        { type: "transfer", token: TOKEN, amount: "OPEN", recipient: connectedAddress },
-        {
-          type: "invoke",
-          contract: fairLaunchAddr,
-          calldata: [
-            num.toHex(launchRoundId),
-            bidCreds.bidId,
-            "1",
-            "${openNoteIds[0]}",
-            "${openNoteIds[1]}",
-          ],
-        },
-      ];
+      const strkAlloc = (round.ticket_size * round.clearing_num) / round.clearing_den;
+      const tokensOut = strkAlloc / round.price;
+      const strkUsed = tokensOut * round.price;
+      const refund = round.ticket_size - strkUsed;
+
+      const actions: WALLET_API.STRK20_ACTION[] = [];
+      let tokenNoteIdArg = "0";
+      let strkNoteIdArg = "0";
+      if (tokensOut > 0n) {
+        actions.push({ type: "transfer", token: round.launch_token, amount: "OPEN", recipient: connectedAddress });
+        tokenNoteIdArg = `\${openNoteIds[${actions.length - 1}]}`;
+      }
+      if (refund > 0n) {
+        actions.push({ type: "transfer", token: TOKEN, amount: "OPEN", recipient: connectedAddress });
+        strkNoteIdArg = `\${openNoteIds[${actions.length - 1}]}`;
+      }
+      actions.push({
+        type: "invoke",
+        contract: fairLaunchAddr,
+        calldata: [num.toHex(launchRoundId), bidCreds.bidId, "1", tokenNoteIdArg, strkNoteIdArg],
+      });
+
       const txH = await submit(actions, setResultClaim, "Fair-launch claim");
       if (txH) setBidClaimed(true);
     } finally {
