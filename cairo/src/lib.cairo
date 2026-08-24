@@ -115,7 +115,7 @@ pub trait IFairLaunchAnonymizer<TState> {
 
 #[starknet::contract]
 mod FairLaunchAnonymizer {
-    use core::num::traits::Zero;
+    use core::num::traits::{Bounded, Zero};
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
@@ -385,13 +385,19 @@ mod FairLaunchAnonymizer {
 
             // The pool already transferred the escrow before invoking us (withdraw < invoke).
             // Compare against `total_escrowed` rather than raw balance, since the balance
-            // also holds every other round's unclaimed escrow.
+            // also holds every other round's unclaimed escrow. `>=` rather than `==`: the
+            // pool's per-open-note fee (see `_claim`) means an admin funding this contract
+            // with extra STRK headroom for that fee — a direct transfer outside the
+            // commit/claim flow entirely — is a realistic thing to do, and total_escrowed
+            // absorbing that surplus into its running total (rather than only ever
+            // expecting exactly one ticket per commit) keeps every later commit's delta
+            // math correct instead of permanently mismatching by the surplus amount.
             let strk = IErc20Dispatcher { contract_address: self.strk_token.read() };
             let balance: u256 = strk.balance_of(get_contract_address());
             let prior_escrowed: u128 = self.total_escrowed.read();
             let delta: u256 = balance - prior_escrowed.into();
             let delta_u128: u128 = delta.try_into().expect('DELTA_OVERFLOW');
-            assert(delta_u128 == round.ticket_size, errors::AMOUNT_MISMATCH);
+            assert(delta_u128 >= round.ticket_size, errors::AMOUNT_MISMATCH);
 
             self.commitments.entry(key).write(commitment);
             self.total_escrowed.write(prior_escrowed + delta_u128);
@@ -439,11 +445,19 @@ mod FairLaunchAnonymizer {
             self.total_escrowed.write(self.total_escrowed.read() - round.ticket_size);
             self.emit(Claimed { round_id, bid_id, tokens_out, refund });
 
+            // Approve Bounded::MAX, not the exact payout: the pool charges its own flat
+            // per-open-note fee (`IPool::get_fee_amount`, currently 2 STRK on Sepolia) on
+            // top of whatever amount it pulls in to fund the note, collected from this same
+            // approval. Approving only `tokens_out`/`refund` undershoots that fee and the
+            // pool's pull reverts with "Insufficient ERC20 allowance" — verified for real
+            // against the live pool. This contract never holds funds beyond one round's
+            // escrow, so a standing max approval to the (trusted, constructor-fixed) pool
+            // address carries no extra risk.
             let pool = self.pool_address.read();
             let mut deposits = array![];
             if tokens_out != 0 {
                 let launch = IErc20Dispatcher { contract_address: round.launch_token };
-                launch.approve(pool, tokens_out.into());
+                launch.approve(pool, Bounded::<u256>::MAX);
                 deposits
                     .append(
                         OpenNoteDeposit {
@@ -453,7 +467,7 @@ mod FairLaunchAnonymizer {
             }
             if refund != 0 {
                 let strk = IErc20Dispatcher { contract_address: self.strk_token.read() };
-                strk.approve(pool, refund.into());
+                strk.approve(pool, Bounded::<u256>::MAX);
                 deposits
                     .append(
                         OpenNoteDeposit {

@@ -391,9 +391,12 @@ export default function WalletAccountV6Tag() {
       return false;
     }
   })();
-  // Single demo round (round_id 0) - the one created live on Sepolia. A real launch
-  // page would list/select rounds; scoped to one for this first pass.
-  const launchRoundId = 0n;
+  // Single demo round - the one created live on Sepolia. A real launch page would
+  // list/select rounds; scoped to one for this first pass. Round 0 on this contract was
+  // the live claim-fix verification round (see cairo/README.md) and is already
+  // finalized/claimed; round 1 is a fresh, currently-open round sized for anyone trying
+  // the flow from this dashboard (0.1 STRK ticket, week-long commit/reveal windows).
+  const launchRoundId = 1n;
   const [round, setRound] = useState<FairLaunchRound | null>(null);
   const [roundError, setRoundError] = useState<string>("");
   const [bidCreds, setBidCreds] = useState<BidCreds | null>(null);

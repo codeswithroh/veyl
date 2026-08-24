@@ -160,6 +160,50 @@ fn test_claim_omits_zero_token_leg_when_ticket_smaller_than_price() {
 }
 
 #[test]
+fn test_commit_tolerates_pre_funded_strk_surplus() {
+    // Mirrors a real deployment where the admin sends this contract extra STRK headroom
+    // (outside the commit/claim flow entirely) to cover the pool's per-open-note fee at
+    // claim time — verified for real against the live Sepolia pool, where a raw pre-funding
+    // transfer before any commit used to permanently break `_commit`'s exact-match delta
+    // check (AMOUNT_MISMATCH) for every commit afterward.
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+    launch.mint(anonymizer.contract_address, 1000);
+
+    // Admin pre-funds a surplus STRK buffer, unrelated to any round's escrow.
+    strk.mint(anonymizer.contract_address, 2000);
+
+    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
+    let round_id = anonymizer
+        .create_round(
+            launch_token: launch.contract_address,
+            price: 10,
+            total_supply: 1000,
+            ticket_size: 10000,
+            commit_end: 100,
+            reveal_end: 200,
+        );
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    let bid_id: felt252 = 'bid_surplus';
+    let salt: felt252 = 'salt_surplus';
+    let commitment = poseidon_hash_span(array![salt].span());
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 50);
+    escrow_ticket(strk, anonymizer.contract_address, 10000);
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    let commit_result = anonymizer
+        .privacy_invoke(round_id, bid_id, FairLaunchAction::Commit(commitment));
+    stop_cheat_caller_address(anonymizer.contract_address);
+    assert(commit_result.len() == 0, 'commit should not pay out');
+    assert(anonymizer.is_revealed(round_id, bid_id) == false, 'not revealed yet');
+
+    // The 2000-unit surplus stays right where it was — commit only escrowed the ticket.
+    assert(strk.balance_of(anonymizer.contract_address) == 12000, 'surplus plus ticket');
+}
+
+#[test]
 fn test_unrevealed_bid_forfeits_and_cannot_claim() {
     let strk = deploy_mock_erc20();
     let launch = deploy_mock_erc20();

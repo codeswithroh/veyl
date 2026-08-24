@@ -114,30 +114,71 @@ round numbers for a cheap real test.
 - **`finalize`** — real, correctly computed a full fill (`clearing_num == clearing_den == 1`,
   one ticket exactly covering `total_supply * price`): tx
   [`0x6a7667ace4fb7161eea8d182b2f9f4cf83914bbe871ee0f52b9a0522785b8de`](https://sepolia.voyager.online/tx/0x6a7667ace4fb7161eea8d182b2f9f4cf83914bbe871ee0f52b9a0522785b8de).
-- **`claim` — was reverting, root-caused and fixed (2026-08-24).** Built via two chained
-  `.with(token).transfer({recipient: self, amount: Open}).done()` blocks (one per token, per
-  the demo app's own real usage pattern in `demo/src/hooks/useTransactions.ts`), then
-  `.invoke((args) => ...)` reading both resolved `openNotes`. Reverted with `ZERO_AMOUNT`
-  from inside the **account's own multicall** (not the pool, not this contract). Root cause
-  confirmed: this was a full-fill round (`ticket_size` divided evenly by `price`), so the
-  STRK-refund side of `claim`'s return was *exactly* zero — and asking the account to open a
-  zero-value note for that leg trips the wallet's own zero-value guard before it ever submits.
-  `_claim` unconditionally returned both legs (with `0` standing in for "nothing to pay"),
-  which meant the caller always pre-created two open notes even when only one would end up
-  funded. Fixed by making `_claim` omit the zero leg from its returned span entirely instead
-  of returning a zero-amount entry, and updating the frontend (`WalletAccountV6Tag.tsx`) to
-  compute `tokens_out`/`refund` from the finalized round before calling claim, so it only
-  pre-creates an open note for the leg(s) that will actually be nonzero. Covered by two new
-  `snforge` tests (`test_full_fill_single_bidder_conserves_value` now asserts a single
-  deposit; `test_claim_omits_zero_token_leg_when_ticket_smaller_than_price` covers the
-  opposite zero leg). **Not yet re-verified against the real Sepolia pool** — the original
-  failing transaction predates this fix; a fresh on-chain claim is still needed to confirm.
+- **`claim` — was reverting with `ZERO_AMOUNT`, root-caused (2026-08-24).** Built via two
+  chained `.with(token).transfer({recipient: self, amount: Open}).done()` blocks (one per
+  token, per the demo app's own real usage pattern in `demo/src/hooks/useTransactions.ts`),
+  then `.invoke((args) => ...)` reading both resolved `openNotes`. Reverted with `ZERO_AMOUNT`
+  from inside the **account's own multicall** (not the pool, not this contract). Root cause:
+  this was a full-fill round (`ticket_size` divided evenly by `price`), so the STRK-refund
+  side of `claim`'s return was *exactly* zero — and asking the account to open a zero-value
+  note for that leg trips the wallet's own zero-value guard before it ever submits. `_claim`
+  unconditionally returned both legs (with `0` standing in for "nothing to pay"), which meant
+  the caller always pre-created two open notes even when only one would end up funded. Fixed
+  by making `_claim` omit the zero leg from its returned span entirely, and updating the
+  frontend (`WalletAccountV6Tag.tsx`) to compute `tokens_out`/`refund` from the finalized
+  round before calling claim, so it only pre-creates an open note for the leg(s) that will
+  actually be nonzero.
+
+## Live pool-mediated round — full verification, 2026-08-24
+
+Re-declared/redeployed after the `ZERO_AMOUNT` fix (new addresses in
+[`address.md`](address.md)) and re-ran the whole round for real. This surfaced two *more*
+real bugs beyond `ZERO_AMOUNT` — both found and fixed live against the actual pool, not
+guessed at:
+
+- **`_claim` approved only the exact payout, not the pool's own fee.** First redeploy's claim
+  attempt got past `ZERO_AMOUNT` (proving that fix works) but hit a *new* revert,
+  `Insufficient ERC20 allowance`, from inside the account's multicall. The pool's
+  `get_fee_amount()` view returns a flat **2 STRK fee per open-note deposit** on Sepolia,
+  pulled from this contract's approval on top of whatever it pulls in for the payout —
+  `_claim` was only approving `tokens_out`/`refund` themselves, nowhere near enough. Fixed by
+  approving `Bounded::<u256>::MAX` instead of the exact amount (see `_claim`'s comment for why
+  a standing max approval to the constructor-fixed pool address is safe here).
+- **`_commit`'s exact-match delta assert breaks under a pre-funded fee buffer.** Covering that
+  2 STRK fee means the anonymizer needs real STRK balance beyond what a self-dealing ticket
+  alone provides (the ticket's value is entirely consumed by the payout in a 1:1 exchange, by
+  construction) — so the natural fix is the admin sending it a STRK buffer directly, outside
+  the commit/claim flow. That immediately broke `_commit`'s `delta_u128 == round.ticket_size`
+  assert (`AMOUNT_MISMATCH`) for *every* commit afterward, since `total_escrowed` never
+  accounts for STRK that didn't arrive via a tracked commit. Fixed by relaxing the assert to
+  `>=` and having `total_escrowed` absorb the full observed delta (see `_commit`'s comment).
+- **Also found and fixed along the way:** the verification script's `autoRegister: true`
+  (harmless) and `autoSelectNotes: "naive"` (picked an oversized note and needed
+  `surplusTo`/explicit `.inputs(...)` to avoid a `Surplus... but no surplus action found`
+  compiler error) — script-side, not contract bugs, but worth knowing if you're writing
+  something similar against this pool.
+
+**Round parameters:** `launch_token = STRK` (self-dealing — the escrowed ticket doubles as
+the token being "sold" back, so no separate demo token was needed), `price = 1`,
+`total_supply = ticket_size = 10000` (raw units) → full fill, `tokens_out = 10000`,
+`refund = 0` — the exact zero-refund shape that originally broke claim. Anonymizer pre-funded
+with 3 STRK (fee-coverage buffer) right after deploy.
+
+- `create_round`: tx [`0x044bcb214a534c37a72f48ba8a80941d3e1f537731fa22301bfed0c0271fc864`](https://sepolia.voyager.online/tx/0x044bcb214a534c37a72f48ba8a80941d3e1f537731fa22301bfed0c0271fc864)
+- `commit` (real pool withdraw + invoke): tx [`0x03f0bb15f0425a3376c6a9b9dae8c30556bb2fadc2c311b33d13e00574d82c96`](https://sepolia.voyager.online/tx/0x03f0bb15f0425a3376c6a9b9dae8c30556bb2fadc2c311b33d13e00574d82c96)
+- `reveal`: tx [`0x063fddc07c6f8ee06cc06dc02030f41a938b43c952328ffa390067c1e2e17b18`](https://sepolia.voyager.online/tx/0x063fddc07c6f8ee06cc06dc02030f41a938b43c952328ffa390067c1e2e17b18)
+- `finalize` (full fill, `clearing_num == clearing_den == 1`): tx [`0x01c689c0a448747e2a62edd7c2dd94e19fc25734af0f4a34c4dd31d212964436`](https://sepolia.voyager.online/tx/0x01c689c0a448747e2a62edd7c2dd94e19fc25734af0f4a34c4dd31d212964436)
+- **`claim` — succeeded**, `is_claimed == true`: tx [`0x04c5890fee19ba753c3251e22c9632035c16acde49e50afc6d3cfb700a00a41d`](https://sepolia.voyager.online/tx/0x04c5890fee19ba753c3251e22c9632035c16acde49e50afc6d3cfb700a00a41d)
+
+All five steps run through the real Sepolia STRK20 privacy pool (not `snforge` mocks) via the
+one-off scripts in `server/scripts/fair-launch-commit.ts` / `fair-launch-claim.ts`.
 
 ## Not yet done
 
-- Re-run a real Sepolia claim against the fixed contract (redeploy required — the fix changes
-  `_claim`'s bytecode, so the currently-deployed class hash in `address.md` still has the bug)
-  to confirm the `ZERO_AMOUNT` fix holds against the actual pool, not just `snforge` mocks.
-- A real audit before any mainnet round.
-- Mainnet deployment — separate step, needs its own explicit go-ahead, only after a real
-  pool-mediated Sepolia round has actually settled end to end, including a successful claim.
+- A real audit before any mainnet round — this contract is unaudited, full stop.
+- Mainnet deployment — separate step, needs its own explicit go-ahead, only after that audit.
+- Verify a wallet-signed (not script-signed) round through the actual dashboard UI with a real
+  browser wallet extension — everything above was driven by scripts holding the account key
+  directly, not through `WalletAccountV6Tag.tsx`'s wallet-connect flow.
+- Verify an oversubscribed (pro-rata, nonzero refund) round against the real pool — only
+  full-fill/zero-refund has been run live so far; the pro-rata math is only `snforge`-tested.

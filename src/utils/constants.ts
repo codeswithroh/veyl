@@ -48,10 +48,15 @@ export const Strk20Networks: Record<number, string> = { 0: "MAINNET", 2: "SEPOLI
 // UNAUDITED, Sepolia-only for now. See cairo/README.md and STRK20_INTEGRATION_PLAN.md
 // §7 before pointing a real launch at this.
 
-// Deployed 2026-08-18, real Sepolia STRK20 pool wired as pool_address. "0x0" = not
-// deployed on this network (mainnet: no deployment yet, needs its own explicit go
-// after a verified Sepolia round — see STRK20_INTEGRATION_PLAN.md §7).
-export const FairLaunchAnonymizerSepolia = "0x3aae3546a8d5da7aa79719afa0703750aa7a6da64abdc2e280f34e08afd05bb";
+// Redeployed 2026-08-24 with all three claim-path fixes (see cairo/address.md and
+// cairo/README.md "Live pool-mediated round — full verification"): _claim omitting
+// zero-amount legs, _claim approving Bounded::MAX to cover the pool's own per-open-note
+// fee, and _commit tolerating a pre-funded fee buffer. A full commit/reveal/finalize/claim
+// round has been run for real against the live Sepolia pool end to end, claim included.
+// Real Sepolia STRK20 pool wired as pool_address. "0x0" = not deployed on this network
+// (mainnet: no deployment yet, needs its own explicit go after a real audit — see
+// STRK20_INTEGRATION_PLAN.md §7).
+export const FairLaunchAnonymizerSepolia = "0x06fa53e7c123f487c30e481a4d8185bbd37f32bcda544b8c37792ed4a12a16dd";
 export const FairLaunchAnonymizerMainnet = "0x0";
 
 // Resolve the fair-launch anonymizer for a frontend provider index (0 = Mainnet, 2 = Sepolia).
