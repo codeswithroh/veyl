@@ -93,10 +93,10 @@ Pool contract: 0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812
 ## Roadmap
 
 - [x] Wallet connect, shield, unshield, private transfer (base)
-- [ ] Unlinkable execution-wallet generation per trade
-- [ ] Sealed-bid fair-launch anonymizer contract
-- [ ] Veyl terminal UI (launch + trade)
-- [ ] Mainnet demo + video
+- [x] Unlinkable execution-wallet generation per trade (shadow accounts, verified end-to-end on Sepolia — see `server/README.md`)
+- [x] Sealed-bid fair-launch anonymizer contract (verified end-to-end on Sepolia, claim included — see `cairo/README.md`)
+- [x] Veyl terminal UI (launch + trade)
+- [ ] Mainnet demo + video (gated on a real audit of the fair-launch contract — see `cairo/README.md`)
 
 ## Acknowledgements
 

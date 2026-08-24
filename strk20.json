@@ -2,7 +2,7 @@
   "transactions": [],
   "contracts": [
     "sepolia:0x02067df54869f30bd1052e334a91320b89da441f4b448042b4405724bd4cbf53",
-    "sepolia:0x03aae3546a8d5da7aa79719afa0703750aa7a6da64abdc2e280f34e08afd05bb"
+    "sepolia:0x06fa53e7c123f487c30e481a4d8185bbd37f32bcda544b8c37792ed4a12a16dd"
   ],
   "demo_video": "",
   "demo_url": "https://veyl-tau.vercel.app"
