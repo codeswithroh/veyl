@@ -503,11 +503,11 @@ export default function WalletAccountV6Tag() {
       const salt = randomFelt();
       const commitment = hash.computePoseidonHashOnElements([salt]);
       const actions: WALLET_API.STRK20_ACTION[] = [
-        { type: "withdraw", token: TOKEN, amount: num.toHex(round.ticket_size), recipient: fairLaunchAddr },
+        { type: "withdraw", token: TOKEN, amount: round.ticket_size.toString(), recipient: fairLaunchAddr },
         {
           type: "invoke",
           contract: fairLaunchAddr,
-          calldata: [num.toHex(launchRoundId), bidId, "0", num.toHex(commitment)],
+          calldata: [launchRoundId.toString(), num.toBigInt(bidId).toString(), "0", num.toBigInt(commitment).toString()],
         },
       ];
       const txH = await submit(actions, setResultCommit, `${fmtStrk(round.ticket_size)} STRK ticket`);
@@ -628,7 +628,7 @@ export default function WalletAccountV6Tag() {
       actions.push({
         type: "invoke",
         contract: fairLaunchAddr,
-        calldata: [num.toHex(launchRoundId), bidCreds.bidId, "1", tokenNoteIdArg, strkNoteIdArg],
+        calldata: [launchRoundId.toString(), num.toBigInt(bidCreds.bidId).toString(), "1", tokenNoteIdArg, strkNoteIdArg],
       });
 
       const txH = await submit(actions, setResultClaim, "Fair-launch claim");
@@ -760,7 +760,7 @@ export default function WalletAccountV6Tag() {
   const handleShield = async () => {
     setResultShield(null);
     const actions: WALLET_API.STRK20_ACTION[] = [
-      { type: "deposit", token: TOKEN, amount: num.toHex(TEN_STRK) },
+      { type: "deposit", token: TOKEN, amount: TEN_STRK.toString() },
     ];
     await submit(actions, setResultShield, "10 STRK");
   };
@@ -772,7 +772,7 @@ export default function WalletAccountV6Tag() {
       return;
     }
     const actions: WALLET_API.STRK20_ACTION[] = [
-      { type: "withdraw", token: TOKEN, amount: num.toHex(ONE_STRK), recipient: connectedAddress },
+      { type: "withdraw", token: TOKEN, amount: ONE_STRK.toString(), recipient: connectedAddress },
     ];
     await submit(actions, setResultUnshield, "1 STRK");
   };
@@ -784,7 +784,7 @@ export default function WalletAccountV6Tag() {
       return;
     }
     const actions: WALLET_API.STRK20_ACTION[] = [
-      { type: "transfer", token: TOKEN, amount: num.toHex(ONE_STRK), recipient: connectedAddress },
+      { type: "transfer", token: TOKEN, amount: ONE_STRK.toString(), recipient: connectedAddress },
     ];
     await submit(actions, setResultTransfer, "1 STRK");
   };
@@ -803,7 +803,7 @@ export default function WalletAccountV6Tag() {
     // "OPEN" / ${poolAddress} / ${openNoteIds[0]} are literal placeholder strings the
     // wallet substitutes during assembly - they must NOT be hex-normalized.
     const actions: WALLET_API.STRK20_ACTION[] = [
-      { type: "withdraw", token: TOKEN, amount: num.toHex(FIVE_STRK), recipient: helper },
+      { type: "withdraw", token: TOKEN, amount: FIVE_STRK.toString(), recipient: helper },
       { type: "transfer", token: TOKEN, amount: "OPEN", recipient: connectedAddress },
       {
         type: "invoke",
