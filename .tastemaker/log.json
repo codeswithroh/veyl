@@ -36,5 +36,23 @@
     "contrast": "text-safe, verified via check_contrast.py --matrix + two ad hoc checks (muted text, success/danger icon fills)",
     "critique_scores": { "show_dont_tell": 4, "philosophy": 4, "hierarchy": 4, "specificity": 5, "restraint": 4, "variety": 4 },
     "notes": "Full supersede of the prior riso/olive direction at the user's explicit request, using real reference images (a Cryptox-style template) plus real provided asset files (hero_bg.mp4, trading.png, chart.webp, risk_management.svg) rather than a text-mediated restyle. hero_bg.mp4 watermark removed via ffmpeg delogo (not cropped/blurred — inpainted using surrounding pixels) before use. trading.png cropped from 1672x941 to 1582x597 (auto-detected content bbox vs. near-black background) after live verification showed ~46% of the original frame was dead black padding, invisible against the equally-dark page background. chart.webp fetched into design/assets but not placed in this pass — available for a future card/stat visual, flagging rather than forcing it in. Live-verified in the running dev server via DOM/computed-style/pixel-sampling checks, not just a build pass, after browser screenshot tooling proved unreliable for scroll verification in this session."
+  },
+  {
+    "date": "2026-08-25",
+    "project": "veyl",
+    "screens": ["app shell (dashboard: Overview / Terminal / Launches)"],
+    "macrostructure": "app-shell (sidebar + topbar + content, per component-patterns.md — Step 2.5 skipped as instructed for app-shell screens)",
+    "beats": null,
+    "archetypes": {
+      "nav": "persistent left sidebar, flat list, primary-colored left-border active state",
+      "topbar": "contextual only (network/wallet chip), shares content bg + border hairline",
+      "workspace": "content column + 400px sticky right rail (trading-terminal split, not a stacked single column)",
+      "data-view": "live launches table (real per-round on-chain reads) + live STRK/USD chart (CoinGecko)"
+    },
+    "palette_seed": "veyl-ember-01 (reused verbatim, not regenerated — this was a structure/layout pass, not a color pass)",
+    "mood": "premium-fintech (ember/vortex) — unchanged",
+    "contrast": "reused existing legal pairings from the 2026-08-16 matrix; no new hex introduced",
+    "critique_scores": { "show_dont_tell": 4, "philosophy": 4, "hierarchy": 4, "specificity": 4, "restraint": 4, "variety": 4 },
+    "notes": "This screen was originally built without going through the skill at all (a bare uni.module.css .panel — floating rounded card, heavy shadow, 520px centered — dropped into an empty page) and the user called it out directly as looking like 'a worthless modal ui,' pointing at real launchpad/trading-terminal references (a purple portfolio dashboard, Coinbase Prime's trading terminal). Rebuilt per component-patterns.md's App shell section. Key fix: WalletAccountV6Tag (the shared trading/launch action component, business logic untouched) now takes a chrome prop — 'shell' is the new flush/integrated skin used everywhere in /dashboard; 'embed' (the original floating-card skin) stays as the default but, checked against actual usage, nothing currently renders the component outside /dashboard, so it's an honestly-unused alternate skin, not something still live on the landing page. Also fixed a real bug surfaced during live verification: initialTab on WalletAccountV6Tag only seeds useState on mount, so clicking a launch round's row while already on the Launches section didn't actually switch tabs until a key={launchInitialTab} was added to force a remount. Also fixed a focus-scroll bug: a trailing 'Open' button in the launches table's last column caused the browser to scroll the table's horizontal-overflow container to bring the focused button into view on click, hiding the first (Round) column — fixed by making the whole row the click target instead (removes both the overflow-inducing column and the focus target), not by fighting the browser's default focus-scroll behavior. anti_slop_scan.py and audit_motion.py both pass clean on src/app/dashboard/."
   }
 ]

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import styles from "./dashboard.module.css";
-import panelStyles from "../uni.module.css";
 import SelectWallet from "../components/client/WalletHandle/SelectWallet";
 import WalletAccountV6Tag from "../components/client/WalletHandle/WalletAccountV6Tag";
 import LaunchesTable from "./LaunchesTable";
@@ -23,18 +22,19 @@ export default function DashboardPage() {
   const isConnected = useStoreWallet((state) => state.isConnected);
   const address = useStoreWallet((state) => state.address);
   const [section, setSection] = useState<(typeof NAV_ITEMS)[number]["key"]>("overview");
+  const [launchInitialTab, setLaunchInitialTab] = useState<"trade" | "launch">("trade");
 
   const networkLabel = constants.Strk20Networks[providerIndex] ?? "Unsupported network";
   const networkDisplay =
     networkLabel === "MAINNET" ? "Starknet Mainnet" : networkLabel === "SEPOLIA" ? "Starknet Sepolia" : networkLabel;
   const shortAddr = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "";
 
-  // Always lands on the "launches" section — its terminal is pinned to the Launch tab
-  // (initialTab="launch"), so "Open →" on any round takes you straight to commit/reveal/
-  // finalize/claim for that round instead of the default Trade tab.
-  const jumpToTerminal = () => {
+  // A round's "Open →" always lands on Launches with the terminal rail pinned to the
+  // Launch tab, so it goes straight to that round's commit/reveal/finalize/claim controls
+  // instead of the default Trade tab.
+  const openRound = () => {
+    setLaunchInitialTab("launch");
     setSection("launches");
-    requestAnimationFrame(() => document.getElementById("terminal")?.scrollIntoView({ behavior: "smooth" }));
   };
 
   return (
@@ -79,57 +79,54 @@ export default function DashboardPage() {
         </header>
 
         <main className={styles.main}>
-          {section === "overview" && (
-            <>
-              <div className={styles.statRow}>
-                <div className={styles.statCard}>
-                  <span className={styles.statLabel}>Network</span>
-                  <span className={styles.statValue}>{networkDisplay}</span>
-                  <span className={styles.statSub}>STRK20 privacy pool</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={styles.statLabel}>Wallet</span>
-                  <span className={styles.statValue}>{isConnected ? shortAddr : "Not connected"}</span>
-                  <span className={styles.statSub}>{isConnected ? "Ready to trade" : "Connect to begin"}</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={styles.statLabel}>Model</span>
-                  <span className={styles.statValue}>Shield → Trade</span>
-                  <span className={styles.statSub}>Positions public, traders private</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={styles.statLabel}>Fair launches</span>
-                  <span className={styles.statValue}>Sealed-bid</span>
-                  <span className={styles.statSub}>Fixed ticket, pro-rata clearing</span>
-                </div>
-              </div>
+          <div className={styles.statRow}>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>Network</span>
+              <span className={styles.statValue}>{networkDisplay}</span>
+              <span className={styles.statSub}>STRK20 privacy pool</span>
+            </div>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>Wallet</span>
+              <span className={styles.statValue}>{isConnected ? shortAddr : "Not connected"}</span>
+              <span className={styles.statSub}>{isConnected ? "Ready to trade" : "Connect to begin"}</span>
+            </div>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>Model</span>
+              <span className={styles.statValue}>Shield → Trade</span>
+              <span className={styles.statSub}>Positions public, traders private</span>
+            </div>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>Fair launches</span>
+              <span className={styles.statValue}>Sealed-bid</span>
+              <span className={styles.statSub}>Fixed ticket, pro-rata clearing</span>
+            </div>
+          </div>
 
-              <div className={styles.grid2}>
+          {section === "terminal" ? (
+            <div className={styles.card}>
+              <div className={styles.cardHead}>
+                <h2>Terminal</h2>
+                <span className={styles.cardHint}>Trade · Launch · Shield · Send · Unshield · Echo · Balances</span>
+              </div>
+              <WalletAccountV6Tag chrome="shell" />
+            </div>
+          ) : (
+            <div className={styles.workspace}>
+              <div className={styles.workspaceMain}>
                 <PriceChart />
-                <LaunchesTable providerIndex={providerIndex} onSelectRound={jumpToTerminal} />
+                <LaunchesTable providerIndex={providerIndex} onSelectRound={openRound} />
               </div>
-
-              <div className={panelStyles.page} style={{ minHeight: "auto", padding: 0, background: "transparent" }}>
-                <WalletAccountV6Tag />
+              <div className={styles.workspaceRail}>
+                <div className={styles.card}>
+                  <div className={styles.cardHead}>
+                    <h2>Terminal</h2>
+                  </div>
+                  {/* key forces a remount when the desired tab changes — initialTab only
+                      seeds useState on mount, so without this, clicking a round's "Open"
+                      while already on this section wouldn't actually switch the tab. */}
+                  <WalletAccountV6Tag chrome="shell" initialTab={launchInitialTab} key={launchInitialTab} />
+                </div>
               </div>
-            </>
-          )}
-
-          {section === "launches" && (
-            <>
-              <LaunchesTable providerIndex={providerIndex} onSelectRound={jumpToTerminal} />
-              <div
-                className={panelStyles.page}
-                style={{ minHeight: "auto", padding: 0, background: "transparent", marginTop: 24 }}
-              >
-                <WalletAccountV6Tag initialTab="launch" />
-              </div>
-            </>
-          )}
-
-          {section === "terminal" && (
-            <div className={panelStyles.page} style={{ minHeight: "auto", padding: 0, background: "transparent" }}>
-              <WalletAccountV6Tag />
             </div>
           )}
         </main>

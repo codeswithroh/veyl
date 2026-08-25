@@ -303,6 +303,25 @@
   box-shadow: 0 24px 60px -24px rgba(255, 90, 46, 0.25), 0 20px 50px -20px rgba(0, 0, 0, 0.6);
 }
 
+/* Integrated-into-app-shell variant (chrome="shell" in WalletAccountV6Tag): flush with the
+   page, full width, no floating-card shadow/radius — a real section, not a modal-like card
+   dropped into empty space. Denser padding too, per the app-shell density rule (a shell
+   reads correctly denser than the marketing page's own "app embed" card). */
+.panelShell {
+  width: 100%;
+  margin: 0;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: none;
+}
+
+.tabsShell {
+  justify-content: flex-start;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
 .tabs {
   display: flex;
   align-items: center;

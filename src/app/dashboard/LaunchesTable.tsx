@@ -121,14 +121,25 @@ export default function LaunchesTable({
                 <th>Revealed</th>
                 <th>Clearing</th>
                 <th>Status</th>
-                <th />
               </tr>
             </thead>
             <tbody>
               {rounds.map((r) => {
                 const phase = phaseOf(r, nowSec);
                 return (
-                  <tr key={r.id}>
+                  // The whole row is the click target (not a cramped trailing button) —
+                  // keeps the table narrow enough not to overflow its column at the
+                  // workspace's usual width, and one wide target beats a tiny link.
+                  <tr
+                    key={r.id}
+                    className={styles.tableRow}
+                    onClick={() => onSelectRound?.(r.id)}
+                    tabIndex={0}
+                    role="button"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") onSelectRound?.(r.id);
+                    }}
+                  >
                     <td>
                       <div className={styles.roundCell}>
                         <StrkCoin size={20} />
@@ -147,11 +158,6 @@ export default function LaunchesTable({
                     </td>
                     <td>
                       <span className={`${styles.statusPill} ${styles[`status-${phase.tone}`]}`}>{phase.label}</span>
-                    </td>
-                    <td>
-                      <button className={styles.rowAction} onClick={() => onSelectRound?.(r.id)}>
-                        Open →
-                      </button>
                     </td>
                   </tr>
                 );

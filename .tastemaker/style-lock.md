@@ -51,3 +51,44 @@ Beats (6, updated 2026-08-16 — see below):
 
 ## Dark mode
 Locked dark-only — same as before, now for a different reason (this identity is a near-black ember ground, not the olive one).
+
+## App shell chrome (2026-08-25 — `/dashboard`, via the tastemaker skill)
+The dashboard was originally built without this skill (a single `uni.module.css` `.panel` —
+floating rounded card, heavy drop shadow, 520px centered width — dropped into an otherwise
+empty page). User called it out directly ("no professional launchpad uses that worthless
+modal ui") with real launchpad/trading-terminal references. Rebuilt as a first-class App
+shell per `component-patterns.md`, reusing the exact locked tokens above, no new palette:
+
+- **Sidebar**: `surface` bg, persistent, flat list (3 destinations: Overview/Terminal/
+  Launches — under the "~7 items" threshold for grouping).
+- **Content area**: `bg`, the quietest surface, per the rule.
+- **Topbar**: shares content `bg` + a `border` hairline underneath, contextual only
+  (network/wallet chip, no nav duplication).
+- **Active nav item**: `primary`-colored 2px left-border accent + `surface` fill — the one
+  dedicated Primary treatment outside a button, per the rule. Hover is a distinct, lighter
+  `surface-2` shift so active/hover never read the same weight (this was wrong before the
+  rebuild — both states used identical `surface`).
+- **Density**: tighter than the marketing page's own card padding (stat tiles 14px not
+  18px+, table cells 9px/12.5px type) — a shell reads correctly denser than its own landing
+  page per the rule, not a cut corner.
+- **`WalletAccountV6Tag` now takes a `chrome` prop** so its shell is a choice, not a hardcode:
+  `"shell"` (flush, full-width, no shadow, left-aligned tabs) is what `/dashboard` uses
+  everywhere now. `"embed"` (the original 520px floating card) stays as the default for
+  backward compatibility, but checked against actual usage, nothing currently renders this
+  component outside `/dashboard` — the landing page's "app embed" beat (`style-lock.md`'s
+  Structure section above) turned out to be the static `trading.png` mockup, not a live
+  embed of this component. Kept the `embed` variant rather than deleting it since it's a
+  real, working alternate skin the component still owns, just currently unused — this is
+  the honest state, not "still used by the landing page" as an earlier draft of this note
+  claimed.
+- **Workspace shape**: a real trading-terminal split (content column + a 400px sticky right
+  rail holding the terminal), not a stacked single column — matches the Coinbase
+  Prime-style reference the user linked (chart/table on the left, order ticket fixed on the
+  right) more than the purple-portfolio reference (which stacks a chart above a table above
+  a widget); picked the terminal-split shape since Veyl's core action *is* the terminal, not
+  a secondary widget.
+- **Motion**: App shell track (per `animation-guidelines.md`) — staggered card entrance on
+  data-load (`prefers-reduced-motion`-gated), no scroll-timeline (nothing to scroll-tell in
+  a shell).
+- Anti-slop + motion scans (`anti_slop_scan.py`, `audit_motion.py`) both pass clean on
+  `src/app/dashboard/`.

@@ -223,7 +223,14 @@ function randomFelt(): string {
   return hex;
 }
 
-export default function WalletAccountV6Tag({ initialTab }: { initialTab?: TabKey } = {}) {
+// chrome="embed" (default): the floating rounded card used to show the app off inside the
+// marketing page's app-embed section. chrome="shell": flush, borderless-top, no drop shadow,
+// left-aligned tabs — for embedding as an integrated section inside the dashboard app shell,
+// which needs to read as part of the page, not a modal-like card floating in empty space.
+export default function WalletAccountV6Tag({
+  initialTab,
+  chrome = "embed",
+}: { initialTab?: TabKey; chrome?: "embed" | "shell" } = {}) {
   const myFrontendProviderIndex = useFrontendProvider(
     (state) => state.currentFrontendProviderIndex
   );
@@ -999,9 +1006,9 @@ export default function WalletAccountV6Tag({ initialTab }: { initialTab?: TabKey
     : "closed";
 
   return (
-    <div className={styles.panel} id="terminal">
+    <div className={`${styles.panel} ${chrome === "shell" ? styles.panelShell : ""}`} id="terminal">
       {/* Action tabs */}
-      <div className={styles.tabs}>
+      <div className={`${styles.tabs} ${chrome === "shell" ? styles.tabsShell : ""}`}>
         {TABS.map((t) => (
           <button
             key={t.key}
