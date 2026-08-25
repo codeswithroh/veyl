@@ -196,6 +196,25 @@ function bidCredsStorageKey(anonymizer: string, roundId: bigint, wallet: string)
   return `veyl-fair-launch-bid:${anonymizer}:${roundId}:${wallet}`;
 }
 
+// STRK20 private-DeFi actions (deposit/withdraw/transfer/invoke) require Wallet API
+// >= 0.10.3 per strk20-by-example.org - "detect capabilities before offering an action."
+// Below that, a connected wallet may not implement wallet_strk20InvokeTransaction at all
+// and reject it with a generic error (e.g. INVALID_REQUEST_PAYLOAD) rather than a clear
+// "unsupported method" - so check this ourselves and say so plainly instead.
+const MIN_STRK20_API_VERSION = [0, 10, 3];
+function supportsStrk20Actions(apiVersions: string[]): boolean {
+  return apiVersions.some((v) => {
+    const parts = v.split(".").map((n) => parseInt(n, 10));
+    for (let i = 0; i < MIN_STRK20_API_VERSION.length; i++) {
+      const a = parts[i] ?? 0;
+      const b = MIN_STRK20_API_VERSION[i];
+      if (a > b) return true;
+      if (a < b) return false;
+    }
+    return true;
+  });
+}
+
 function randomFelt(): string {
   const bytes = new Uint8Array(31); // 248 bits, safely under the STARK field prime
   crypto.getRandomValues(bytes);
@@ -212,6 +231,7 @@ export default function WalletAccountV6Tag({ initialTab }: { initialTab?: TabKey
   const connectedAddress = useStoreWallet((state) => state.address);
   const isConnected = useStoreWallet((state) => state.isConnected);
   const chain = useStoreWallet((state) => state.chain);
+  const walletApiList = useStoreWallet((state) => state.walletApiList);
   const [chainIdWA, setChainIdWA] = useState<string>(chain);
 
   // STRK20 privacy pool is available on Mainnet (index 0) and Sepolia (index 2).
@@ -658,6 +678,15 @@ export default function WalletAccountV6Tag({ initialTab }: { initialTab?: TabKey
   ): Promise<string | undefined> {
     if (!myWalletAccount) {
       setResult(errorResult("No WalletAccount available."));
+      return undefined;
+    }
+    if (walletApiList.length && !supportsStrk20Actions(walletApiList)) {
+      setResult(
+        errorResult(
+          `This wallet reports Wallet API ${walletApiList.join(", ")}, but STRK20 private actions need >= 0.10.3. ` +
+            `Update your wallet extension, or a raw error like INVALID_REQUEST_PAYLOAD from here likely means this — not a bug in what we're sending.`
+        )
+      );
       return undefined;
     }
     let txH: string;
