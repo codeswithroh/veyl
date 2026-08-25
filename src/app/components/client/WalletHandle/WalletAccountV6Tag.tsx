@@ -204,7 +204,7 @@ function randomFelt(): string {
   return hex;
 }
 
-export default function WalletAccountV6Tag() {
+export default function WalletAccountV6Tag({ initialTab }: { initialTab?: TabKey } = {}) {
   const myFrontendProviderIndex = useFrontendProvider(
     (state) => state.currentFrontendProviderIndex
   );
@@ -239,7 +239,7 @@ export default function WalletAccountV6Tag() {
   const [resultDeploy, setResultDeploy] = useState<ActionResult | null>(null);
   const [deploying, setDeploying] = useState<boolean>(false);
   // Active action tab (Umbra-style single-action interface).
-  const [tab, setTab] = useState<TabKey>("trade");
+  const [tab, setTab] = useState<TabKey>(initialTab ?? "trade");
 
   // --- Trade (private swap via AVNU) ------------------------------------
   const avnuConfig = AVNU_CONFIG[myFrontendProviderIndex];
@@ -970,7 +970,7 @@ export default function WalletAccountV6Tag() {
     : "closed";
 
   return (
-    <div className={styles.panel}>
+    <div className={styles.panel} id="terminal">
       {/* Action tabs */}
       <div className={styles.tabs}>
         {TABS.map((t) => (
