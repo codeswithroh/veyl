@@ -5,9 +5,7 @@ import styles from "../../../uni.module.css";
 import * as constants from "@/utils/constants";
 
 export const TOKEN = constants.addrSTRK;
-export const TEN_STRK = 10n * 10n ** 18n;
 export const FIVE_STRK = 5n * 10n ** 18n;
-export const ONE_STRK = 1n * 10n ** 18n;
 
 export function fmtStrk(amount: bigint): string {
   return fmtUnits(amount, 18);
@@ -18,6 +16,18 @@ export function fmtUnits(amount: bigint, decimals: number): string {
   const whole = amount / base;
   const frac = (amount % base).toString().padStart(decimals, "0").replace(/0+$/, "");
   return frac ? `${whole}.${frac}` : `${whole}`;
+}
+
+// Inverse of fmtUnits: "2.5" @ 18 decimals -> 2500000000000000000n. Returns null for
+// anything that isn't a plain non-negative decimal number (empty input, garbage, etc).
+export function parseUnits(input: string, decimals: number): bigint | null {
+  const trimmed = input.trim();
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
+  const [whole, frac = ""] = trimmed.split(".");
+  if (frac.length > decimals) return null;
+  const paddedFrac = frac.padEnd(decimals, "0");
+  const value = BigInt(whole + paddedFrac);
+  return value > 0n ? value : null;
 }
 
 export function shortHex(h: string): string {

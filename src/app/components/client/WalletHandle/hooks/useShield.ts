@@ -3,24 +3,30 @@
 import { useState } from "react";
 import type { WALLET_API } from "@starknet-io/types-js";
 import { useSubmit } from "../useSubmit";
-import { ActionResult, TEN_STRK, TOKEN } from "../walletTerminalShared";
+import { ActionResult, TOKEN, errorResult, parseUnits } from "../walletTerminalShared";
 
-// Shield: deposit a fixed demo amount of public STRK into the privacy pool.
+// Shield: deposit public STRK into the privacy pool.
 export function useShield() {
   const submit = useSubmit();
+  const [amount, setAmount] = useState("10");
   const [result, setResult] = useState<ActionResult | null>(null);
   const [shielding, setShielding] = useState(false);
 
   const run = async () => {
     setResult(null);
+    const wei = parseUnits(amount, 18);
+    if (wei === null) {
+      setResult(errorResult("Enter an amount greater than 0."));
+      return;
+    }
     setShielding(true);
     try {
-      const actions: WALLET_API.STRK20_ACTION[] = [{ type: "deposit", token: TOKEN, amount: TEN_STRK.toString() }];
-      await submit(actions, setResult, "10 STRK");
+      const actions: WALLET_API.STRK20_ACTION[] = [{ type: "deposit", token: TOKEN, amount: wei.toString() }];
+      await submit(actions, setResult, `${amount} STRK`);
     } finally {
       setShielding(false);
     }
   };
 
-  return { result, shielding, run, amount: "10", token: "STRK" };
+  return { result, shielding, run, amount, setAmount, token: "STRK" };
 }

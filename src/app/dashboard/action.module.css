@@ -1,10 +1,19 @@
 /* tastemaker-stamp: screen=transactional-form | mood=premium-fintech(ember/vortex) | palette=locked | contrast=text-safe */
 
 .wrap {
-  max-width: 560px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
 }
 
 .card {
@@ -16,6 +25,38 @@
   flex-direction: column;
   gap: 20px;
 }
+
+/* Side info panel: fills the rest of the row instead of leaving a lone form card
+   floating in empty space — steps + a live shielded-balance readout. */
+.infoCard {
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+.infoTitle { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0; }
+.stepList { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.step { display: flex; gap: 12px; }
+.stepNum {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.stepText { font-size: 12.5px; color: var(--muted); line-height: 1.5; padding-top: 2px; }
+.stepText b { color: var(--text); font-weight: 600; }
 
 /* Flow diagram: From -> To, each side tinted by direction */
 .flow {
@@ -47,6 +88,17 @@
   background: var(--surface-2);
 }
 .amountBig { font-size: 2rem; font-weight: 800; line-height: 1; }
+.amountInput {
+  background: transparent;
+  border: none;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text);
+  width: 100%;
+  min-width: 0;
+  outline: none;
+  font-family: var(--font-body), sans-serif;
+}
 .amountToken {
   display: inline-flex;
   align-items: center;

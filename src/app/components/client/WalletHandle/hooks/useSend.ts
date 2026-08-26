@@ -4,12 +4,13 @@ import { useState } from "react";
 import type { WALLET_API } from "@starknet-io/types-js";
 import { useStoreWallet } from "../../../Wallet/walletContext";
 import { useSubmit } from "../useSubmit";
-import { ActionResult, ONE_STRK, TOKEN, errorResult } from "../walletTerminalShared";
+import { ActionResult, TOKEN, errorResult, parseUnits } from "../walletTerminalShared";
 
-// Send: a private (self-)transfer inside the pool, a fixed demo amount.
+// Send: a private (self-)transfer inside the pool.
 export function useSend() {
   const submit = useSubmit();
   const connectedAddress = useStoreWallet((state) => state.address);
+  const [amount, setAmount] = useState("1");
   const [result, setResult] = useState<ActionResult | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -19,16 +20,21 @@ export function useSend() {
       setResult(errorResult("Connect a wallet first (recipient = connected account)."));
       return;
     }
+    const wei = parseUnits(amount, 18);
+    if (wei === null) {
+      setResult(errorResult("Enter an amount greater than 0."));
+      return;
+    }
     setSending(true);
     try {
       const actions: WALLET_API.STRK20_ACTION[] = [
-        { type: "transfer", token: TOKEN, amount: ONE_STRK.toString(), recipient: connectedAddress },
+        { type: "transfer", token: TOKEN, amount: wei.toString(), recipient: connectedAddress },
       ];
-      await submit(actions, setResult, "1 STRK");
+      await submit(actions, setResult, `${amount} STRK`);
     } finally {
       setSending(false);
     }
   };
 
-  return { result, sending, run, amount: "1", token: "STRK" };
+  return { result, sending, run, amount, setAmount, token: "STRK" };
 }

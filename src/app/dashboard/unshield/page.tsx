@@ -10,7 +10,7 @@ import { useFrontendProvider } from "../../components/client/provider/providerCo
 import { StrkCoin } from "../../components/TokenIcons";
 
 export default function UnshieldPage() {
-  const { result, unshielding, run, amount, token } = useUnshield();
+  const { result, unshielding, run, amount, setAmount, token } = useUnshield();
   const isConnected = useStoreWallet((s) => s.isConnected);
   const providerIndex = useFrontendProvider((s) => s.currentFrontendProviderIndex);
 
@@ -24,37 +24,64 @@ export default function UnshieldPage() {
         </div>
       </div>
 
-      <div className={styles.card}>
-        <div className={styles.flow}>
-          <div className={`${styles.flowNode} ${styles.flowNodePrivate}`}>
-            <span className={styles.flowLabel}>From</span>
-            <span className={styles.flowValue}>Shielded pool</span>
+      <div className={styles.layout}>
+        <div className={styles.card}>
+          <div className={styles.flow}>
+            <div className={`${styles.flowNode} ${styles.flowNodePrivate}`}>
+              <span className={styles.flowLabel}>From</span>
+              <span className={styles.flowValue}>Shielded pool</span>
+            </div>
+            <span className={styles.flowArrow}>→</span>
+            <div className={`${styles.flowNode} ${styles.flowNodePublic}`}>
+              <span className={styles.flowLabel}>To</span>
+              <span className={styles.flowValue}>Public balance</span>
+            </div>
           </div>
-          <span className={styles.flowArrow}>→</span>
-          <div className={`${styles.flowNode} ${styles.flowNodePublic}`}>
-            <span className={styles.flowLabel}>To</span>
-            <span className={styles.flowValue}>Public balance</span>
+
+          <div className={styles.amountRow}>
+            <input
+              className={styles.amountInput}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder="0"
+              aria-label="Amount to unshield"
+            />
+            <span className={styles.amountToken}>
+              <StrkCoin size={20} />
+              {token}
+            </span>
           </div>
+          <p className={styles.hint}>Withdraws to your connected public account.</p>
+
+          {isConnected ? (
+            <button className={uni.btnCta} disabled={unshielding} onClick={run}>
+              {unshielding ? "Unshielding…" : "Unshield"}
+            </button>
+          ) : (
+            <SelectWallet variant="ctaBig" />
+          )}
+
+          {result && <ResultCard r={result} providerIndex={providerIndex} />}
         </div>
 
-        <div className={styles.amountRow}>
-          <span className={styles.amountBig}>{amount}</span>
-          <span className={styles.amountToken}>
-            <StrkCoin size={20} />
-            {token}
-          </span>
+        <div className={styles.infoCard}>
+          <p className={styles.infoTitle}>How it works</p>
+          <ol className={styles.stepList}>
+            <li className={styles.step}>
+              <span className={styles.stepNum}>1</span>
+              <span className={styles.stepText}>A <b>withdraw</b> spends a note from the pool and pays out the public STRK ERC20 to a chosen address.</span>
+            </li>
+            <li className={styles.step}>
+              <span className={styles.stepNum}>2</span>
+              <span className={styles.stepText}>This demo always withdraws to your own connected account.</span>
+            </li>
+            <li className={styles.step}>
+              <span className={styles.stepNum}>3</span>
+              <span className={styles.stepText}>The withdrawn amount and recipient become public on-chain — only the link to how it entered the pool stays hidden.</span>
+            </li>
+          </ol>
         </div>
-        <p className={styles.hint}>Withdraws to your connected account — a fixed demo amount for now.</p>
-
-        {isConnected ? (
-          <button className={uni.btnCta} disabled={unshielding} onClick={run}>
-            {unshielding ? "Unshielding…" : "Unshield"}
-          </button>
-        ) : (
-          <SelectWallet variant="ctaBig" />
-        )}
-
-        {result && <ResultCard r={result} providerIndex={providerIndex} />}
       </div>
     </div>
   );

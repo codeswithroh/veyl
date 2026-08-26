@@ -24,11 +24,16 @@ export function useSubmit() {
       setResult(errorResult("No WalletAccount available."));
       return undefined;
     }
-    if (walletApiList.length && !supportsStrk20Actions(walletApiList)) {
+    // Fail closed: an empty walletApiList means the wallet either didn't answer
+    // wallet_supportedSpecs or answered with nothing usable — treat that the same as
+    // "too old" instead of letting an unchecked request through to the wallet, where it
+    // surfaces as an opaque INVALID_REQUEST_PAYLOAD instead of this explanation.
+    if (!walletApiList.length || !supportsStrk20Actions(walletApiList)) {
       setResult(
         errorResult(
-          `This wallet reports Wallet API ${walletApiList.join(", ")}, but STRK20 private actions need >= 0.10.3. ` +
-            `Update your wallet extension, or a raw error like INVALID_REQUEST_PAYLOAD from here likely means this — not a bug in what we're sending.`
+          walletApiList.length
+            ? `This wallet reports Wallet API ${walletApiList.join(", ")}, but STRK20 private actions need >= 0.10.3. Update your wallet extension.`
+            : `This wallet didn't report a Wallet API version, so STRK20 private actions can't be confirmed as supported. Update your wallet extension, or a raw error like INVALID_REQUEST_PAYLOAD from here likely means this — not a bug in what we're sending.`
         )
       );
       return undefined;
@@ -38,7 +43,15 @@ export function useSubmit() {
       const r = await myWalletAccount.strk20InvokeTransaction(actions);
       txH = r.transaction_hash;
     } catch (error: any) {
-      setResult(errorResult(error?.message ?? error?.toString?.() ?? String(error)));
+      const msg = error?.message ?? error?.toString?.() ?? String(error);
+      const hasInvoke = actions.some((a) => a.type === "invoke");
+      setResult(
+        errorResult(
+          hasInvoke && /INVALID_REQUEST_PAYLOAD/i.test(msg)
+            ? `${msg}\n\nThis action combines a fund transfer with a contract invoke in one request — some wallets only support plain deposit/withdraw/transfer and reject that combination. If Ready is up to date and this still fails, the wallet likely doesn't support STRK20's "invoke" action yet.`
+            : msg
+        )
+      );
       return undefined;
     }
     setResult({
