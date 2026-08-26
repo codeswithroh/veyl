@@ -92,3 +92,43 @@ shell per `component-patterns.md`, reusing the exact locked tokens above, no new
   a shell).
 - Anti-slop + motion scans (`anti_slop_scan.py`, `audit_motion.py`) both pass clean on
   `src/app/dashboard/`.
+
+## Per-feature page split + permissionless Launch (2026-08-26)
+Follow-on to the 2026-08-25 app-shell rebuild: the shell above was still wrapping a single
+shared tabbed component (`WalletAccountV6Tag`, chrome="shell") behind each sidebar route —
+user called this out again as still being "this model architecture" and asked for the tabs
+themselves gone, one real page/component per feature. Same locked tokens, no new palette.
+
+- `WalletAccountV6Tag.tsx` (the 1294-line monolith) deleted outright. Its logic was extracted
+  verbatim into single-purpose hooks (`useShield`, `useSend`, `useUnshield`, `useBalances`,
+  `useEcho`, `useTrade`, `useFairLaunchRound`, `useCreateLaunch`, `useLaunchList`) under
+  `WalletHandle/hooks/`, sharing `walletTerminalShared.tsx` (formatters, `ResultCard`) and
+  `useSubmit.ts` (wallet-invoke submit path) — pure relocation, no business-logic rewrite, so
+  the already-verified on-chain correctness carried over untouched.
+- Each sidebar destination (`/dashboard/shield`, `/send`, `/unshield`, `/echo`, `/balances`,
+  `/trade`, `/launch`) is now its own route + page component with its own layout, not a tab
+  panel switching visibility inside one shared card. `action.module.css` holds the shared
+  flow-card look for the four simple actions; `trade.module.css` and `launch.module.css` are
+  dedicated per-feature stylesheets for the two structurally different ones (swap card;
+  browse grid + form + detail page).
+- **Launch went from a single fixed on-chain round to a real permissionless launchpad**: the
+  Cairo contract's `create_round` dropped its admin gate and now atomically pulls the launch
+  token via `transfer_from` in the same call, plus stores real on-chain `RoundMetadata`
+  (name/symbol/description/image_url as `ByteArray`). `/dashboard/launch` is a browse grid
+  (`useLaunchList`, probes round ids), `/dashboard/launch/create` is a real multi-field form
+  (token details, contract address, economics), `/dashboard/launch/[id]` is a detail page
+  with commit/reveal/finalize/claim — matching the "real launchpad" reference the user asked
+  for (ticker, description, image, not a dummy single-token demo).
+- Dead CSS removed: `uni.module.css`'s `.panel`/`.panelShell`/`.tabsShell`/`.tabs`/`.tab`/
+  `.tabActive` family (only consumer was the deleted monolith) — confirmed zero remaining
+  references before deletion.
+- Motion audit follow-up: `launch.module.css` `.launchCard:hover` transform was missing both
+  `prefers-reduced-motion` and hover-capability gating — fixed by nesting
+  `@media (prefers-reduced-motion: no-preference)` inside `@media (hover: hover) and
+  (pointer: fine)`. Re-ran `audit_motion.py`: passed clean (29 files scanned).
+- Anti-slop follow-up: `echo/page.tsx` used genuine emoji (✅❌⏳) for verdict icons — replaced
+  with plain typographic glyphs (✓✗⋯), consistent with the rest of the app. Remaining
+  Unicode-symbol icons (sidebar nav glyphs, `iconBadge` symbols) are an accepted MEDIUM
+  finding: `fetch_icons.py` could not reach Iconify in this sandbox
+  (`SSL: CERTIFICATE_VERIFY_FAILED`, network-blocked), so a real icon-set swap is deferred,
+  not silently skipped.

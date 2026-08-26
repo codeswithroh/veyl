@@ -48,15 +48,15 @@ export const Strk20Networks: Record<number, string> = { 0: "MAINNET", 2: "SEPOLI
 // UNAUDITED, Sepolia-only for now. See cairo/README.md and STRK20_INTEGRATION_PLAN.md
 // §7 before pointing a real launch at this.
 
-// Redeployed 2026-08-24 with all three claim-path fixes (see cairo/address.md and
-// cairo/README.md "Live pool-mediated round — full verification"): _claim omitting
-// zero-amount legs, _claim approving Bounded::MAX to cover the pool's own per-open-note
-// fee, and _commit tolerating a pre-funded fee buffer. A full commit/reveal/finalize/claim
-// round has been run for real against the live Sepolia pool end to end, claim included.
-// Real Sepolia STRK20 pool wired as pool_address. "0x0" = not deployed on this network
-// (mainnet: no deployment yet, needs its own explicit go after a real audit — see
+// Redeployed 2026-08-26: create_round is now permissionless (any wallet can launch,
+// atomically funding the round with their own tokens in the same call) and Round gained
+// on-chain display metadata (name/symbol/description/image_url via get_round_metadata) —
+// see cairo/address.md and cairo/README.md. Builds on the claim-path fixes verified end to
+// end on 2026-08-24 (ZERO_AMOUNT, pool fee approval, commit surplus tolerance), unchanged
+// here. Real Sepolia STRK20 pool wired as pool_address. "0x0" = not deployed on this
+// network (mainnet: no deployment yet, needs its own explicit go after a real audit — see
 // STRK20_INTEGRATION_PLAN.md §7).
-export const FairLaunchAnonymizerSepolia = "0x06fa53e7c123f487c30e481a4d8185bbd37f32bcda544b8c37792ed4a12a16dd";
+export const FairLaunchAnonymizerSepolia = "0x0328a81887f0eaa960b95579c9caf1ef596cf40c331f95117ed365b8ed42d6a2";
 export const FairLaunchAnonymizerMainnet = "0x0";
 
 // Resolve the fair-launch anonymizer for a frontend provider index (0 = Mainnet, 2 = Sepolia).
@@ -130,6 +130,59 @@ export const FairLaunchAnonymizerAbi = [
         name: "finalize",
         inputs: [{ name: "round_id", type: "core::integer::u64" }],
         outputs: [],
+        state_mutability: "external",
+    },
+    {
+        type: "struct",
+        name: "strk20_invoke_helper::RoundMetadata",
+        members: [
+            { name: "creator", type: "core::starknet::contract_address::ContractAddress" },
+            { name: "name", type: "core::byte_array::ByteArray" },
+            { name: "symbol", type: "core::byte_array::ByteArray" },
+            { name: "description", type: "core::byte_array::ByteArray" },
+            { name: "image_url", type: "core::byte_array::ByteArray" },
+        ],
+    },
+    {
+        type: "function",
+        name: "get_round_metadata",
+        inputs: [{ name: "round_id", type: "core::integer::u64" }],
+        outputs: [{ type: "strk20_invoke_helper::RoundMetadata" }],
+        state_mutability: "view",
+    },
+    // create_round is permissionless (see cairo/src/lib.cairo) — any connected wallet can
+    // call this directly after approving this contract for `total_supply` of launch_token.
+    {
+        type: "function",
+        name: "create_round",
+        inputs: [
+            { name: "launch_token", type: "core::starknet::contract_address::ContractAddress" },
+            { name: "price", type: "core::integer::u128" },
+            { name: "total_supply", type: "core::integer::u128" },
+            { name: "ticket_size", type: "core::integer::u128" },
+            { name: "commit_end", type: "core::integer::u64" },
+            { name: "reveal_end", type: "core::integer::u64" },
+            { name: "name", type: "core::byte_array::ByteArray" },
+            { name: "symbol", type: "core::byte_array::ByteArray" },
+            { name: "description", type: "core::byte_array::ByteArray" },
+            { name: "image_url", type: "core::byte_array::ByteArray" },
+        ],
+        outputs: [{ type: "core::integer::u64" }],
+        state_mutability: "external",
+    },
+] as const;
+
+// Minimal ERC20 ABI fragment — just enough to approve the fair-launch anonymizer to pull
+// `total_supply` of a creator's own token when they call create_round.
+export const Erc20ApproveAbi = [
+    {
+        type: "function",
+        name: "approve",
+        inputs: [
+            { name: "spender", type: "core::starknet::contract_address::ContractAddress" },
+            { name: "amount", type: "core::integer::u256" },
+        ],
+        outputs: [{ type: "core::bool" }],
         state_mutability: "external",
     },
 ] as const;

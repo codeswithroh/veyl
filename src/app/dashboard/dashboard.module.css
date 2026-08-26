@@ -1,4 +1,4 @@
-/* tastemaker-stamp: screen=app-shell | mood=premium-fintech(ember/vortex) | palette=locked(.tastemaker/style-lock.md) | contrast=text-safe | motion=app-shell track (staggered card entrance on data-load, no scroll timeline — there's nothing to scroll-tell in a shell) */
+/* tastemaker-stamp: screen=app-shell | mood=premium-fintech(ember/vortex) | palette=locked(.tastemaker/style-lock.md) | contrast=text-safe | motion=app-shell track (staggered card entrance on data-load, panel/route transitions — no scroll timeline, there's nothing to scroll-tell in a shell) */
 
 @keyframes dashCardIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -12,15 +12,28 @@
   .statRow .statCard:nth-child(2) { animation-delay: 40ms; }
   .statRow .statCard:nth-child(3) { animation-delay: 80ms; }
   .statRow .statCard:nth-child(4) { animation-delay: 120ms; }
-  .workspaceMain .card:nth-child(2) { animation-delay: 60ms; }
-  .workspaceRail .card { animation-delay: 100ms; }
 }
 
 .shell {
+  position: relative;
   min-height: 100dvh;
   display: flex;
   background: var(--bg);
   color: var(--text);
+  isolation: isolate;
+}
+
+/* Ambient depth: a quiet green-tinted glow behind the content column, so charts/cards
+   have something to sit on besides flat black. Fixed behind everything (z-index -1),
+   never intercepts clicks. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 78% 0%, rgba(111, 191, 122, 0.10), transparent 65%),
+    radial-gradient(45% 40% at 15% 85%, rgba(255, 90, 46, 0.06), transparent 70%);
 }
 
 /* ---- Sidebar ---- */
@@ -155,7 +168,7 @@
   gap: 18px;
 }
 
-/* ---- Stat row ---- */
+/* ---- Stat row (Overview) ---- */
 .statRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -174,8 +187,7 @@
 .statValue { font-size: 1rem; font-weight: 700; color: var(--text); }
 .statSub { font-size: 11px; color: var(--muted); }
 
-/* ---- Workspace: content column + sticky terminal rail (real trading-terminal shape —
-   ticket/panel stays put while chart/table scroll, per Coinbase Prime-style references) ---- */
+/* ---- Workspace: content column + sticky terminal rail ---- */
 .workspace {
   display: grid;
   grid-template-columns: 1fr 400px;
@@ -196,7 +208,6 @@
   .workspace { grid-template-columns: 1fr; }
   .workspaceRail { position: static; }
 }
-
 @media (max-width: 860px) {
   .statRow { grid-template-columns: repeat(2, 1fr); }
 }
@@ -223,27 +234,20 @@
 .chartBox { height: 140px; margin-top: 4px; }
 
 /* table */
-/* overflow-anchor:none plus keeping the table narrow enough not to overflow its column at
-   the workspace's default width: clicking a control in the last cell (e.g. "Open") focuses
-   it, and a focused element inside a horizontally-scrollable ancestor gets scrolled into
-   view by the browser by default - if the table overflows at all, that silently scrolls
-   the first column (Round) out of view the instant a row action is clicked. Tightening
-   padding/type-scale here removes the overflow at the workspace's usual width instead of
-   fighting the browser's own focus-scroll behavior. */
-.tableWrap { overflow-x: auto; overflow-anchor: none; }
-.table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table th {
   text-align: left;
   font-weight: 600;
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  padding: 0 8px 8px;
+  letter-spacing: 0.03em;
+  padding: 0 10px 8px;
   border-bottom: 1px solid var(--border);
 }
 .table td {
-  padding: 9px 8px;
+  padding: 10px 10px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
   white-space: nowrap;
@@ -263,6 +267,9 @@
 .status-pending { background: rgba(255, 90, 46, 0.16); color: var(--primary); }
 .status-done { background: var(--surface-2); color: var(--muted); }
 
-.tableRow { cursor: pointer; transition: background 0.12s ease; }
-.tableRow:hover { background: var(--surface-2); }
-.tableRow:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.rowAction {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.rowAction:hover { color: var(--text); }

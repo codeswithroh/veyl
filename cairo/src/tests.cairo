@@ -39,26 +39,50 @@ fn escrow_ticket(strk: IMockErc20Dispatcher, anonymizer: ContractAddress, amount
     stop_cheat_caller_address(strk.contract_address);
 }
 
+// create_round is permissionless: the creator (ADMIN() here, just a convenient reused
+// identity, not a privileged role anymore) must hold and approve total_supply of the
+// launch token themselves — the contract pulls it via transfer_from in the same call.
+fn create_test_round(
+    anonymizer: IFairLaunchAnonymizerDispatcher,
+    launch: IMockErc20Dispatcher,
+    price: u128,
+    total_supply: u128,
+    ticket_size: u128,
+    commit_end: u64,
+    reveal_end: u64,
+) -> u64 {
+    launch.mint(ADMIN(), total_supply.into());
+    start_cheat_caller_address(launch.contract_address, ADMIN());
+    launch.approve(anonymizer.contract_address, total_supply.into());
+    stop_cheat_caller_address(launch.contract_address);
+
+    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
+    let round_id = anonymizer
+        .create_round(
+            launch_token: launch.contract_address,
+            price: price,
+            total_supply: total_supply,
+            ticket_size: ticket_size,
+            commit_end: commit_end,
+            reveal_end: reveal_end,
+            name: "Demo Token",
+            symbol: "DEMO",
+            description: "A demo token for fair-launch tests",
+            image_url: "",
+        );
+    stop_cheat_caller_address(anonymizer.contract_address);
+    round_id
+}
+
 #[test]
 fn test_full_fill_single_bidder_conserves_value() {
     let strk = deploy_mock_erc20();
     let launch = deploy_mock_erc20();
     let anonymizer = deploy_anonymizer(strk.contract_address);
 
-    // Fund the round with the sale token, as create_round's docs require.
-    launch.mint(anonymizer.contract_address, 1000);
-
-    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
-    let round_id = anonymizer
-        .create_round(
-            launch_token: launch.contract_address,
-            price: 10, // 10 STRK per whole launch_token unit
-            total_supply: 1000,
-            ticket_size: 10000, // exactly covers the round: 1000 * 10
-            commit_end: 100,
-            reveal_end: 200,
-        );
-    stop_cheat_caller_address(anonymizer.contract_address);
+    let round_id = create_test_round(
+        anonymizer, launch, price: 10, total_supply: 1000, ticket_size: 10000, commit_end: 100, reveal_end: 200,
+    );
 
     let bid_id: felt252 = 'bid_1';
     let salt: felt252 = 'salt_1';
@@ -112,22 +136,13 @@ fn test_claim_omits_zero_token_leg_when_ticket_smaller_than_price() {
     let strk = deploy_mock_erc20();
     let launch = deploy_mock_erc20();
     let anonymizer = deploy_anonymizer(strk.contract_address);
-    launch.mint(anonymizer.contract_address, 1000);
 
     // ticket_size (5) < price (10) -> tokens_out rounds down to 0, so the whole ticket
     // comes back as a refund. The token leg must be omitted entirely, not returned as a
     // zero-amount deposit — mirrors the full-fill-with-zero-refund case but on the other leg.
-    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
-    let round_id = anonymizer
-        .create_round(
-            launch_token: launch.contract_address,
-            price: 10,
-            total_supply: 1000,
-            ticket_size: 5,
-            commit_end: 100,
-            reveal_end: 200,
-        );
-    stop_cheat_caller_address(anonymizer.contract_address);
+    let round_id = create_test_round(
+        anonymizer, launch, price: 10, total_supply: 1000, ticket_size: 5, commit_end: 100, reveal_end: 200,
+    );
 
     let bid_id: felt252 = 'bid_small';
     let salt: felt252 = 'salt_small';
@@ -169,22 +184,12 @@ fn test_commit_tolerates_pre_funded_strk_surplus() {
     let strk = deploy_mock_erc20();
     let launch = deploy_mock_erc20();
     let anonymizer = deploy_anonymizer(strk.contract_address);
-    launch.mint(anonymizer.contract_address, 1000);
+    let round_id = create_test_round(
+        anonymizer, launch, price: 10, total_supply: 1000, ticket_size: 10000, commit_end: 100, reveal_end: 200,
+    );
 
     // Admin pre-funds a surplus STRK buffer, unrelated to any round's escrow.
     strk.mint(anonymizer.contract_address, 2000);
-
-    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
-    let round_id = anonymizer
-        .create_round(
-            launch_token: launch.contract_address,
-            price: 10,
-            total_supply: 1000,
-            ticket_size: 10000,
-            commit_end: 100,
-            reveal_end: 200,
-        );
-    stop_cheat_caller_address(anonymizer.contract_address);
 
     let bid_id: felt252 = 'bid_surplus';
     let salt: felt252 = 'salt_surplus';
@@ -208,19 +213,9 @@ fn test_unrevealed_bid_forfeits_and_cannot_claim() {
     let strk = deploy_mock_erc20();
     let launch = deploy_mock_erc20();
     let anonymizer = deploy_anonymizer(strk.contract_address);
-    launch.mint(anonymizer.contract_address, 1000);
-
-    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
-    let round_id = anonymizer
-        .create_round(
-            launch_token: launch.contract_address,
-            price: 10,
-            total_supply: 1000,
-            ticket_size: 5000,
-            commit_end: 100,
-            reveal_end: 200,
-        );
-    stop_cheat_caller_address(anonymizer.contract_address);
+    let round_id = create_test_round(
+        anonymizer, launch, price: 10, total_supply: 1000, ticket_size: 5000, commit_end: 100, reveal_end: 200,
+    );
 
     let bid_id: felt252 = 'bid_never_revealed';
     let salt: felt252 = 'salt_x';
@@ -246,22 +241,13 @@ fn test_oversubscribed_round_pro_rata_allocation() {
     let strk = deploy_mock_erc20();
     let launch = deploy_mock_erc20();
     let anonymizer = deploy_anonymizer(strk.contract_address);
-    launch.mint(anonymizer.contract_address, 1000);
 
     // raise_cap = total_supply * price = 10000. Two 6000-STRK tickets both reveal, so
     // total_raised = 12000 > raise_cap — the round is oversubscribed and must clear
     // pro-rata rather than fully filling both bidders.
-    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
-    let round_id = anonymizer
-        .create_round(
-            launch_token: launch.contract_address,
-            price: 10,
-            total_supply: 1000,
-            ticket_size: 6000,
-            commit_end: 100,
-            reveal_end: 200,
-        );
-    stop_cheat_caller_address(anonymizer.contract_address);
+    let round_id = create_test_round(
+        anonymizer, launch, price: 10, total_supply: 1000, ticket_size: 6000, commit_end: 100, reveal_end: 200,
+    );
 
     let bid_a: felt252 = 'bid_a';
     let salt_a: felt252 = 'salt_a';
@@ -321,4 +307,44 @@ fn test_oversubscribed_round_pro_rata_allocation() {
 
     assert(anonymizer.is_claimed(round_id, bid_a), 'a should be claimed');
     assert(anonymizer.is_claimed(round_id, bid_b), 'b should be claimed');
+}
+
+#[test]
+fn test_create_round_is_permissionless_and_atomically_funded() {
+    // Anyone can create a round for their own token — no admin gate, and no separate,
+    // skippable "now go fund it" step: total_supply moves out of the creator's own balance
+    // in this same call.
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    let random_creator: ContractAddress = 'random_creator'.try_into().unwrap();
+    launch.mint(random_creator, 500);
+    start_cheat_caller_address(launch.contract_address, random_creator);
+    launch.approve(anonymizer.contract_address, 500);
+    stop_cheat_caller_address(launch.contract_address);
+
+    start_cheat_caller_address(anonymizer.contract_address, random_creator);
+    let round_id = anonymizer
+        .create_round(
+            launch_token: launch.contract_address,
+            price: 2,
+            total_supply: 500,
+            ticket_size: 1000,
+            commit_end: 100,
+            reveal_end: 200,
+            name: "My Token",
+            symbol: "MTK",
+            description: "Created by a random, non-admin wallet",
+            image_url: "https://example.com/mtk.png",
+        );
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    assert(launch.balance_of(anonymizer.contract_address) == 500, 'not atomically funded');
+    assert(launch.balance_of(random_creator) == 0, 'creator not debited');
+
+    let meta = anonymizer.get_round_metadata(round_id);
+    assert(meta.creator == random_creator, 'wrong creator recorded');
+    assert(meta.name == "My Token", 'wrong name recorded');
+    assert(meta.symbol == "MTK", 'wrong symbol recorded');
 }

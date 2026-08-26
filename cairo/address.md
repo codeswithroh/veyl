@@ -58,3 +58,36 @@ pool-mediated round — full verification" for round parameters and every transa
 `create_round` → `commit` (real pool withdraw+invoke) → `reveal` → `finalize` (full fill,
 `clearing_num == clearing_den == 1`) → **`claim` succeeded** (`is_claimed == true`), the
 exact full-fill/zero-refund scenario that originally reverted with `ZERO_AMOUNT`.
+
+**Superseded (2026-08-26 — `create_round` still admin-gated):** the instance above
+(`0x06fa53e7c123f487c30e481a4d8185bbd37f32bcda544b8c37792ed4a12a16dd`) required the
+constructor's `admin` address to call `create_round`. Replaced to make launch creation
+permissionless (see current entry below).
+
+**Current — FairLaunchAnonymizer, redeployed 2026-08-26, permissionless create_round +
+on-chain metadata:**
+
+contract class hash : 0x3bb0d397a81123a861793ab8317ef3c485bb82c368f81b0684262a582ee7139
+
+contract address (sepolia) : 0x0328a81887f0eaa960b95579c9caf1ef596cf40c331f95117ed365b8ed42d6a2
+
+constructor args : same as above (admin/strk_token/pool_address) — `admin` is now vestigial,
+kept only because the constructor signature didn't need to change; nothing reads it anymore.
+
+**What changed:** `create_round` no longer requires the caller to be `admin` — any wallet
+can open a round for a token they hold, and the contract atomically pulls `total_supply` of
+that token from the caller via `transfer_from` in the same call (the caller must approve
+first), so a round can never exist half-funded. `Round` itself is unchanged; a new
+`RoundMetadata` (creator, name, symbol, description, image_url — all `ByteArray`, stored in
+their own map so the hot commit/reveal/finalize/claim path never touches a non-`Copy` type)
+is written once at creation and read via the new `get_round_metadata` view.
+
+**Verified for real on Sepolia:** a round created by the funded deployer account (acting as
+an ordinary, non-privileged caller this time) after approving the contract for 1 STRK,
+carrying real metadata ("Veyl Demo Launch" / "VEYL" / a description / an image URL) — read
+back correctly via `get_round_metadata`. `snforge` additionally covers creation by a
+completely unrelated address with its own freshly-minted token (see
+`test_create_round_is_permissionless_and_atomically_funded`). Commit/reveal/finalize/claim
+themselves are unchanged from the fully-verified round above and were not re-run live on
+this new instance — the claim-path fixes they exercise live in `_commit`/`_claim`, neither
+of which this change touched.

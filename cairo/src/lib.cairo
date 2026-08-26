@@ -71,10 +71,26 @@ pub struct Round {
     pub clearing_den: u128,
 }
 
+// Display metadata, written once at create_round and never rewritten — kept in its own
+// map (not on Round) so the hot commit/reveal/finalize/claim path never touches a
+// ByteArray-carrying struct (ByteArray isn't Copy, and Round is copied by value on every
+// read-modify-write in this file).
+#[derive(Drop, Serde, starknet::Store)]
+pub struct RoundMetadata {
+    pub creator: ContractAddress,
+    pub name: ByteArray,
+    pub symbol: ByteArray,
+    pub description: ByteArray,
+    pub image_url: ByteArray,
+}
+
 #[starknet::interface]
 pub trait IErc20<TState> {
     fn balance_of(self: @TState, account: ContractAddress) -> u256;
     fn approve(ref self: TState, spender: ContractAddress, amount: u256) -> bool;
+    fn transfer_from(
+        ref self: TState, sender: ContractAddress, recipient: ContractAddress, amount: u256,
+    ) -> bool;
 }
 
 #[starknet::interface]
@@ -88,7 +104,11 @@ pub trait IFairLaunchAnonymizer<TState> {
         ref self: TState, round_id: u64, bid_id: felt252, action: FairLaunchAction,
     ) -> Span<OpenNoteDeposit>;
 
-    /// Admin-only: opens a new fixed-price round. Returns the new round_id.
+    /// Permissionless: anyone can open a round for any token they hold. Pulls exactly
+    /// `total_supply` of `launch_token` from the caller via `transfer_from` in this same
+    /// call (the caller must have approved this contract first) — every round is genuinely
+    /// funded the moment it's created, not dependent on a separate, skippable funding step.
+    /// Returns the new round_id.
     fn create_round(
         ref self: TState,
         launch_token: ContractAddress,
@@ -97,6 +117,10 @@ pub trait IFairLaunchAnonymizer<TState> {
         ticket_size: u128,
         commit_end: u64,
         reveal_end: u64,
+        name: ByteArray,
+        symbol: ByteArray,
+        description: ByteArray,
+        image_url: ByteArray,
     ) -> u64;
 
     /// Public, no funds move. Proves `bid_id`'s commitment was `hash(salt)` and counts it
@@ -109,6 +133,7 @@ pub trait IFairLaunchAnonymizer<TState> {
     fn finalize(ref self: TState, round_id: u64);
 
     fn get_round(self: @TState, round_id: u64) -> Round;
+    fn get_round_metadata(self: @TState, round_id: u64) -> RoundMetadata;
     fn is_revealed(self: @TState, round_id: u64, bid_id: felt252) -> bool;
     fn is_claimed(self: @TState, round_id: u64, bid_id: felt252) -> bool;
 }
@@ -122,16 +147,17 @@ mod FairLaunchAnonymizer {
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use super::{
         FairLaunchAction, IErc20Dispatcher, IErc20DispatcherTrait, OpenNoteDeposit, Round,
+        RoundMetadata,
     };
 
     pub mod errors {
-        pub const NOT_ADMIN: felt252 = 'NOT_ADMIN';
         pub const BAD_POOL: felt252 = 'BAD_POOL';
         pub const ZERO_TOKEN: felt252 = 'ZERO_TOKEN';
         pub const ZERO_PRICE: felt252 = 'ZERO_PRICE';
         pub const ZERO_SUPPLY: felt252 = 'ZERO_SUPPLY';
         pub const ZERO_TICKET: felt252 = 'ZERO_TICKET';
         pub const BAD_DEADLINES: felt252 = 'BAD_DEADLINES';
+        pub const FUNDING_FAILED: felt252 = 'FUNDING_FAILED';
         pub const ROUND_NOT_FOUND: felt252 = 'ROUND_NOT_FOUND';
         pub const COMMIT_CLOSED: felt252 = 'COMMIT_CLOSED';
         pub const AMOUNT_MISMATCH: felt252 = 'AMOUNT_MISMATCH';
@@ -153,6 +179,7 @@ mod FairLaunchAnonymizer {
         pool_address: ContractAddress,
         next_round_id: u64,
         rounds: Map<u64, Round>,
+        round_metadata: Map<u64, RoundMetadata>,
         // (round_id, note_id) -> commitment hash. Zero means "no commit yet".
         commitments: Map<(u64, felt252), felt252>,
         revealed: Map<(u64, felt252), bool>,
@@ -177,6 +204,8 @@ mod FairLaunchAnonymizer {
     struct RoundCreated {
         #[key]
         round_id: u64,
+        #[key]
+        creator: ContractAddress,
         launch_token: ContractAddress,
         price: u128,
         total_supply: u128,
@@ -254,13 +283,25 @@ mod FairLaunchAnonymizer {
             ticket_size: u128,
             commit_end: u64,
             reveal_end: u64,
+            name: ByteArray,
+            symbol: ByteArray,
+            description: ByteArray,
+            image_url: ByteArray,
         ) -> u64 {
-            assert(get_caller_address() == self.admin.read(), errors::NOT_ADMIN);
             assert(launch_token.is_non_zero(), errors::ZERO_TOKEN);
             assert(price != 0, errors::ZERO_PRICE);
             assert(total_supply != 0, errors::ZERO_SUPPLY);
             assert(ticket_size != 0, errors::ZERO_TICKET);
             assert(commit_end < reveal_end, errors::BAD_DEADLINES);
+
+            let creator = get_caller_address();
+            // Pull the creator's own tokens atomically, in this same call, rather than
+            // trusting a separate "please fund this before anyone claims" step — the
+            // round can only ever exist already backed by real supply.
+            let launch = IErc20Dispatcher { contract_address: launch_token };
+            let funded = launch
+                .transfer_from(creator, get_contract_address(), total_supply.into());
+            assert(funded, errors::FUNDING_FAILED);
 
             let round_id = self.next_round_id.read();
             self.next_round_id.write(round_id + 1);
@@ -282,9 +323,14 @@ mod FairLaunchAnonymizer {
                     },
                 );
             self
+                .round_metadata
+                .entry(round_id)
+                .write(RoundMetadata { creator, name, symbol, description, image_url });
+            self
                 .emit(
                     RoundCreated {
                         round_id,
+                        creator,
                         launch_token,
                         price,
                         total_supply,
@@ -353,6 +399,11 @@ mod FairLaunchAnonymizer {
 
         fn get_round(self: @ContractState, round_id: u64) -> Round {
             self._get_round(round_id)
+        }
+
+        fn get_round_metadata(self: @ContractState, round_id: u64) -> RoundMetadata {
+            self._get_round(round_id); // ROUND_NOT_FOUND for a nonexistent round
+            self.round_metadata.entry(round_id).read()
         }
 
         fn is_revealed(self: @ContractState, round_id: u64, bid_id: felt252) -> bool {

@@ -292,64 +292,6 @@
 .walletHint a { color: var(--pink-text); font-weight: 600; text-decoration: none; }
 .walletHint a:hover { text-decoration: underline; }
 
-/* --- Tabbed action interface --------------------------------------------- */
-.panel {
-  width: min(520px, calc(100vw - 32px));
-  margin: 0 auto;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  padding: 20px;
-  box-shadow: 0 24px 60px -24px rgba(255, 90, 46, 0.25), 0 20px 50px -20px rgba(0, 0, 0, 0.6);
-}
-
-/* Integrated-into-app-shell variant (chrome="shell" in WalletAccountV6Tag): flush with the
-   page, full width, no floating-card shadow/radius — a real section, not a modal-like card
-   dropped into empty space. Denser padding too, per the app-shell density rule (a shell
-   reads correctly denser than the marketing page's own "app embed" card). */
-.panelShell {
-  width: 100%;
-  margin: 0;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: none;
-}
-
-.tabsShell {
-  justify-content: flex-start;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
-  margin-bottom: 14px;
-}
-
-.tabs {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.tab {
-  font-family: var(--font-body), sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  border-radius: 999px;
-  padding: 8px 15px;
-  cursor: pointer;
-  transition: background 140ms, color 140ms;
-}
-@media (hover: hover) and (pointer: fine) {
-  .tab:hover { color: var(--ink); }
-}
-.tabActive { color: var(--pink-text); background: var(--pink-soft); font-weight: 600; }
-@media (hover: hover) and (pointer: fine) {
-  .tabActive:hover { color: var(--pink-text); }
-}
-
 .inputBlock {
   background: var(--inset);
   border: 1px solid var(--line);

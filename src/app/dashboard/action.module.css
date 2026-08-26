@@ -1,0 +1,95 @@
+/* tastemaker-stamp: screen=transactional-form | mood=premium-fintech(ember/vortex) | palette=locked | contrast=text-safe */
+
+.wrap {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Flow diagram: From -> To, each side tinted by direction */
+.flow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.flowNode {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.flowNodePublic { background: var(--surface-2); }
+.flowNodePrivate { background: rgba(255, 90, 46, 0.08); border-color: rgba(255, 90, 46, 0.25); }
+.flowLabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.flowValue { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.flowArrow { font-size: 20px; color: var(--primary); flex: none; }
+
+.amountRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.amountBig { font-size: 2rem; font-weight: 800; line-height: 1; }
+.amountToken {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.hint { font-size: 12.5px; color: var(--muted); }
+
+.iconBadge {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  flex: none;
+}
+.iconBadgeAccent { color: var(--primary); border-color: rgba(255, 90, 46, 0.3); background: rgba(255, 90, 46, 0.08); }
+
+.pageHead { display: flex; align-items: center; gap: 12px; }
+.pageHeadText h2 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.pageHeadText p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+
+.balancesList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.balanceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 13px;
+  font-weight: 600;
+}

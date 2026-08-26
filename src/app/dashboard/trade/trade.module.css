@@ -1,0 +1,92 @@
+/* tastemaker-stamp: screen=transactional-form | mood=premium-fintech(ember/vortex) | palette=locked | contrast=text-safe */
+
+.wrap {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pageHead { display: flex; align-items: center; gap: 12px; }
+.pageHeadText h2 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.pageHeadText p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.iconBadge {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: rgba(255, 90, 46, 0.08);
+  border: 1px solid rgba(255, 90, 46, 0.3);
+  color: var(--primary);
+  flex: none;
+}
+
+.card {
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.swapStack { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.swapDivider {
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--muted);
+  margin: -8px 0;
+  z-index: 1;
+}
+.side {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sideLabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.sideMain { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.amountInput {
+  background: transparent;
+  border: none;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--text);
+  width: 100%;
+  outline: none;
+  font-family: var(--font-body), sans-serif;
+}
+.bigValue { font-size: 1.8rem; font-weight: 800; color: var(--muted); }
+.tokenPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.tokenSelect {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+}
+.subLine { font-size: 12px; color: var(--muted); }
