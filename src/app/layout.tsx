@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, Space_Mono, Plus_Jakarta_Sans } from 'next/font/google'
 import './globals.css'
+import WalletAutoConnect from './components/client/WalletHandle/WalletAutoConnect'
 
 // Type pairing from .tastemaker/style-lock.md (ember/vortex direction):
 // Plus Jakarta Sans (bold display) + Inter (body/UI) + Space Mono (addresses/hashes).
@@ -139,6 +140,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
+        <WalletAutoConnect />
         {children}
       </body>
     </html>

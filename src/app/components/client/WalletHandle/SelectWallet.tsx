@@ -1,16 +1,14 @@
 "use client";
 import styles from "../../../uni.module.css";
 import { useStoreWallet } from "../../Wallet/walletContext";
-import { useFrontendProvider } from "../provider/providerContext";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { walletV6, validateAndParseAddress, constants as SNconstants, WalletAccountV6 } from "starknet";
-import { WALLET_API } from "@starknet-io/types-js";
-import { myFrontendProviders } from "@/utils/constants";
 import { createStore, type Store } from "@starknet-io/get-starknet-discovery";
 import type {
   WalletWithStarknetFeatures,
 } from '@starknet-io/get-starknet-wallet-standard/features';
+import { useWalletConnect } from "./useWalletConnect";
+import { forgetWallet } from "./walletPersistence";
 
 
 // Normalize wallet identifiers so starknetkit's connector id / SWO name
@@ -23,20 +21,12 @@ function normalizeId(s: string): string {
 export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" | "ctaBig" | "ctaCompact" }) {
 
   const router = useRouter();
-  const setMyWallet = useStoreWallet(state => state.setMyStarknetWalletObject);
-
-  const setMyWalletAccount = useStoreWallet(state => state.setMyWalletAccount);
-  const myFrontendProviderIndex = useFrontendProvider(state => state.currentFrontendProviderIndex);
-  const { setCurrentFrontendProviderIndex } = useFrontendProvider(state => state);
+  const connectWallet = useWalletConnect();
 
   const isConnected = useStoreWallet(state => state.isConnected);
-  const setConnected = useStoreWallet(state => state.setConnected);
   const address = useStoreWallet(state => state.address);
-
-  const setWalletApi = useStoreWallet(state => state.setWalletApiList);
-
-  const setChain = useStoreWallet(state => state.setChain);
-  const setAddressAccount = useStoreWallet(state => state.setAddressAccount);
+  const starknetWalletObject = useStoreWallet(state => state.StarknetWalletObject);
+  const disconnectWallet = useStoreWallet(state => state.disconnectWallet);
 
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string>("");
@@ -61,33 +51,16 @@ export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" |
     return !id.includes("metamask") && !id.includes("braavos");
   });
 
-  // Unchanged connection flow: takes the wallet-standard wallet and populates
-  // the zustand store with a WalletAccountV6 + account/chain/permissions.
-  async function handleSelectedWallet(selectedWallet: WalletWithStarknetFeatures) {
-    setMyWallet(selectedWallet); // zustand
-    console.log("Trying to connect wallet=", selectedWallet);
-    const myWA = await WalletAccountV6.connect(myFrontendProviders[2], selectedWallet);
-    setMyWalletAccount(myWA);
-    console.log("WalletAccount created=", myWA);
-    const result = await walletV6.requestAccounts(selectedWallet);
-    if (typeof (result) == "string") {
-      console.log("This Wallet is not compatible.");
-      return;
+  // Disconnect: best-effort tell the wallet extension itself, then clear our own
+  // store + the remembered-wallet flag so a refresh doesn't silently reconnect.
+  function handleDisconnect() {
+    try {
+      starknetWalletObject?.features?.["standard:disconnect"]?.disconnect?.();
+    } catch {
+      /* not every wallet implements standard:disconnect - our own state is cleared regardless */
     }
-    console.log("Current account addr =", result);
-    if (Array.isArray(result)) {
-      const addr = validateAndParseAddress(result[0]);
-      setAddressAccount(addr); // zustand
-    }
-    const isConnectedWallet: boolean = await walletV6.getPermissions(selectedWallet).then((res: any) => (res as WALLET_API.Permission[]).includes(WALLET_API.Permission.ACCOUNTS));
-    setConnected(isConnectedWallet); // zustand
-    if (isConnectedWallet) {
-      const chainId = (await walletV6.requestChainId(selectedWallet)) as string;
-      setChain(chainId);
-      setCurrentFrontendProviderIndex(chainId === SNconstants.StarknetChainId.SN_MAIN ? 0 : 2);
-      console.log("change Provider index to :", myFrontendProviderIndex);
-    }
-    setWalletApi(await walletV6.supportedSpecs(selectedWallet));
+    forgetWallet();
+    disconnectWallet();
   }
 
   // Open the wallet picker so the user can choose (Ready, Xverse, ...).
@@ -107,7 +80,7 @@ export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" |
     setError("");
     setConnecting(true);
     try {
-      await handleSelectedWallet(w);
+      await connectWallet(w);
       setPickerOpen(false);
       router.push("/dashboard");
     } catch (err: any) {
@@ -170,7 +143,7 @@ export default function SelectWallet({ variant = "ctaBig" }: { variant?: "nav" |
       return (
         <button
           className={styles.addrPill}
-          onClick={() => setConnected(false)}
+          onClick={handleDisconnect}
           title="Disconnect"
         >
           <span className={styles.addrDot} />

@@ -27,6 +27,7 @@ export interface WalletState {
     setWalletApiList: (version: string[]) => void,
     selectedApiVersion: string,
     setSelectedApiVersion: (version: string) => void,
+    disconnectWallet: () => void,
 
 }
 
@@ -51,4 +52,17 @@ export const useStoreWallet = create<WalletState>()(set => ({
     setWalletApiList: (walletApi: string[]) => { set(state => ({ walletApiList: walletApi })) },
     selectedApiVersion: "default",
     setSelectedApiVersion: (selectedApiVersion: string) => { set(state => ({ selectedApiVersion })) },
+    // Full logout: clears every derived-from-connection field. StarknetWalletObject is left
+    // alone so the caller can still reach its features (e.g. standard:disconnect) right
+    // before/after calling this.
+    disconnectWallet: () => { set(() => ({
+        address: "",
+        chain: "",
+        myWalletAccount: undefined,
+        account: undefined,
+        provider: undefined,
+        isConnected: false,
+        walletApiList: [],
+        selectedApiVersion: "default",
+    })) },
     }));
