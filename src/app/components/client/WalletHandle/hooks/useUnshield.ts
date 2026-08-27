@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { WALLET_API } from "@starknet-io/types-js";
 import { useStoreWallet } from "../../../Wallet/walletContext";
 import { useSubmit } from "../useSubmit";
-import { ActionResult, TOKEN, errorResult, parseUnits } from "../walletTerminalShared";
+import { ActionResult, TOKEN, errorResult, felt, parseUnits } from "../walletTerminalShared";
 
 // Unshield: withdraw from the pool back to the connected public address.
 export function useUnshield() {
@@ -28,7 +28,7 @@ export function useUnshield() {
     setUnshielding(true);
     try {
       const actions: WALLET_API.STRK20_ACTION[] = [
-        { type: "withdraw", token: TOKEN, amount: wei.toString(), recipient: connectedAddress },
+        { type: "withdraw", token: TOKEN, amount: felt(wei), recipient: connectedAddress },
       ];
       await submit(actions, setResult, `${amount} STRK`);
     } finally {

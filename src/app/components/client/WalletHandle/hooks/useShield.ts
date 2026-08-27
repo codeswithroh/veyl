@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { WALLET_API } from "@starknet-io/types-js";
 import { useSubmit } from "../useSubmit";
-import { ActionResult, TOKEN, errorResult, parseUnits } from "../walletTerminalShared";
+import { ActionResult, TOKEN, errorResult, felt, parseUnits } from "../walletTerminalShared";
 
 // Shield: deposit public STRK into the privacy pool.
 export function useShield() {
@@ -21,7 +21,7 @@ export function useShield() {
     }
     setShielding(true);
     try {
-      const actions: WALLET_API.STRK20_ACTION[] = [{ type: "deposit", token: TOKEN, amount: wei.toString() }];
+      const actions: WALLET_API.STRK20_ACTION[] = [{ type: "deposit", token: TOKEN, amount: felt(wei) }];
       await submit(actions, setResult, `${amount} STRK`);
     } finally {
       setShielding(false);

@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { WALLET_API } from "@starknet-io/types-js";
 import { useStoreWallet } from "../../../Wallet/walletContext";
 import { useSubmit } from "../useSubmit";
-import { ActionResult, TOKEN, errorResult, parseUnits } from "../walletTerminalShared";
+import { ActionResult, TOKEN, errorResult, felt, parseUnits } from "../walletTerminalShared";
 
 // Send: a private (self-)transfer inside the pool.
 export function useSend() {
@@ -28,7 +28,7 @@ export function useSend() {
     setSending(true);
     try {
       const actions: WALLET_API.STRK20_ACTION[] = [
-        { type: "transfer", token: TOKEN, amount: wei.toString(), recipient: connectedAddress },
+        { type: "transfer", token: TOKEN, amount: felt(wei), recipient: connectedAddress },
       ];
       await submit(actions, setResult, `${amount} STRK`);
     } finally {

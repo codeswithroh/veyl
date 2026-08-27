@@ -7,7 +7,7 @@ import * as constants from "@/utils/constants";
 import { useStoreWallet } from "../../../Wallet/walletContext";
 import { useFrontendProvider } from "../../provider/providerContext";
 import { useSubmit } from "../useSubmit";
-import { ActionResult, FIVE_STRK, TOKEN, Verdict, errorResult, fmtStrk, shortHex } from "../walletTerminalShared";
+import { ActionResult, FIVE_STRK, TOKEN, Verdict, errorResult, felt, fmtStrk, shortHex } from "../walletTerminalShared";
 
 // Echo: round-trip verification test against the echo-helper anonymizer — withdraw STRK to
 // it, create an open note for the output, invoke the helper to fill it, then verify the
@@ -95,7 +95,7 @@ export function useEcho() {
     try {
       const helper = num.toHex(echoHelperAddr);
       const actions: WALLET_API.STRK20_ACTION[] = [
-        { type: "withdraw", token: TOKEN, amount: FIVE_STRK.toString(), recipient: helper },
+        { type: "withdraw", token: TOKEN, amount: felt(FIVE_STRK), recipient: helper },
         { type: "transfer", token: TOKEN, amount: "OPEN", recipient: connectedAddress },
         { type: "invoke", contract: helper, calldata: [num.toHex(TOKEN), "${poolAddress}", "${openNoteIds[0]}"] },
       ];

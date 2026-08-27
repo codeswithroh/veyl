@@ -7,7 +7,7 @@ import * as constants from "@/utils/constants";
 import { useStoreWallet } from "../../../Wallet/walletContext";
 import { useFrontendProvider } from "../../provider/providerContext";
 import { useSubmit } from "../useSubmit";
-import { ActionResult, TOKEN, errorResult, fmtStrk, randomFelt, receiptToResult } from "../walletTerminalShared";
+import { ActionResult, TOKEN, errorResult, felt, fmtStrk, randomFelt, receiptToResult } from "../walletTerminalShared";
 
 export type FairLaunchRound = {
   launch_token: string;
@@ -187,11 +187,11 @@ export function useFairLaunchRound(roundId: bigint) {
       const salt = randomFelt();
       const commitment = hash.computePoseidonHashOnElements([salt]);
       const actions: WALLET_API.STRK20_ACTION[] = [
-        { type: "withdraw", token: TOKEN, amount: round.ticket_size.toString(), recipient: fairLaunchAddr },
+        { type: "withdraw", token: TOKEN, amount: felt(round.ticket_size), recipient: fairLaunchAddr },
         {
           type: "invoke",
           contract: fairLaunchAddr,
-          calldata: [roundId.toString(), num.toBigInt(bidId).toString(), "0", num.toBigInt(commitment).toString()],
+          calldata: [felt(roundId), felt(bidId), "0x0", felt(commitment)],
         },
       ];
       const txH = await submit(actions, setResultCommit, `${fmtStrk(round.ticket_size)} STRK ticket`);
@@ -269,8 +269,8 @@ export function useFairLaunchRound(roundId: bigint) {
       const refund = round.ticket_size - strkUsed;
 
       const actions: WALLET_API.STRK20_ACTION[] = [];
-      let tokenNoteIdArg = "0";
-      let strkNoteIdArg = "0";
+      let tokenNoteIdArg = "0x0";
+      let strkNoteIdArg = "0x0";
       if (tokensOut > 0n) {
         actions.push({ type: "transfer", token: round.launch_token, amount: "OPEN", recipient: connectedAddress });
         tokenNoteIdArg = `\${openNoteIds[${actions.length - 1}]}`;
@@ -282,7 +282,7 @@ export function useFairLaunchRound(roundId: bigint) {
       actions.push({
         type: "invoke",
         contract: fairLaunchAddr,
-        calldata: [roundId.toString(), num.toBigInt(bidCreds.bidId).toString(), "1", tokenNoteIdArg, strkNoteIdArg],
+        calldata: [felt(roundId), felt(bidCreds.bidId), "0x1", tokenNoteIdArg, strkNoteIdArg],
       });
 
       const txH = await submit(actions, setResultClaim, "Fair-launch claim");

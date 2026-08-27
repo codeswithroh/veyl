@@ -30,6 +30,14 @@ export function parseUnits(input: string, decimals: number): bigint | null {
   return value > 0n ? value : null;
 }
 
+// Canonical FELT string for STRK20_ACTION fields (amount, calldata items): the wallet
+// API spec (@starknet-io/types-js) requires 0x-prefixed hex matching
+// ^0x(0|[a-fA-F1-9][a-fA-F0-9]{0,62})$ — no leading zero digits, and NOT plain decimal.
+// num.toHex() already produces this canonical form for a bigint.
+export function felt(value: bigint | string): string {
+  return num.toHex(num.toBigInt(value));
+}
+
 export function shortHex(h: string): string {
   const hex = num.toHex(h);
   return hex.length <= 13 ? hex : `${hex.slice(0, 7)}...${hex.slice(-4)}`;
@@ -147,7 +155,9 @@ export function randomFelt(): string {
   crypto.getRandomValues(bytes);
   let hex = "0x";
   for (const b of bytes) hex += b.toString(16).padStart(2, "0");
-  return hex;
+  // Canonicalize: the zero-padded loop above can leave a leading-zero hex digit
+  // (e.g. "0x0a3f...") which fails the FELT pattern's "no leading zero digit" rule.
+  return felt(hex);
 }
 
 function explorerTxUrl(providerIndex: number, h: string) {

@@ -43,15 +43,7 @@ export function useSubmit() {
       const r = await myWalletAccount.strk20InvokeTransaction(actions);
       txH = r.transaction_hash;
     } catch (error: any) {
-      const msg = error?.message ?? error?.toString?.() ?? String(error);
-      const hasInvoke = actions.some((a) => a.type === "invoke");
-      setResult(
-        errorResult(
-          hasInvoke && /INVALID_REQUEST_PAYLOAD/i.test(msg)
-            ? `${msg}\n\nThis action combines a fund transfer with a contract invoke in one request — some wallets only support plain deposit/withdraw/transfer and reject that combination. If Ready is up to date and this still fails, the wallet likely doesn't support STRK20's "invoke" action yet.`
-            : msg
-        )
-      );
+      setResult(errorResult(error?.message ?? error?.toString?.() ?? String(error)));
       return undefined;
     }
     setResult({
