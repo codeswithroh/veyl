@@ -11,9 +11,6 @@ import {
   BASE_URL,
   PAYMASTER_BASE_URL,
   PRIVACY_POOL_ADDRESS,
-  SEPOLIA_BASE_URL,
-  SEPOLIA_PAYMASTER_BASE_URL,
-  SEPOLIA_PRIVACY_POOL_ADDRESS,
   type Quote,
   type Token,
 } from "@avnu/avnu-sdk";
@@ -22,10 +19,11 @@ import { useStoreWallet } from "../../../Wallet/walletContext";
 import { useFrontendProvider } from "../../provider/providerContext";
 import { ActionResult, TOKEN, errorResult, fmtUnits, receiptToResult, shortHex } from "../walletTerminalShared";
 
-const AVNU_CONFIG: Record<number, { baseUrl: string; paymasterBaseUrl: string; poolAddress: string }> = {
-  0: { baseUrl: BASE_URL, paymasterBaseUrl: PAYMASTER_BASE_URL, poolAddress: PRIVACY_POOL_ADDRESS },
-  2: { baseUrl: SEPOLIA_BASE_URL, paymasterBaseUrl: SEPOLIA_PAYMASTER_BASE_URL, poolAddress: SEPOLIA_PRIVACY_POOL_ADDRESS },
-};
+// AVNU only actually lists tokens/prices/routes on Mainnet - its Sepolia environment
+// exists but returns an empty catalog. So the terminal always BROWSES live Mainnet
+// market data (real, public, independent of which chain the wallet happens to be on)
+// and only requires the wallet to actually be on Mainnet to execute a trade.
+const MARKET_CONFIG = { baseUrl: BASE_URL, paymasterBaseUrl: PAYMASTER_BASE_URL, poolAddress: PRIVACY_POOL_ADDRESS };
 
 export type TradeSide = "buy" | "sell";
 
@@ -43,15 +41,16 @@ function parseAmountToUnits(amountStr: string, decimals: number): bigint | null 
 }
 
 // Trade: real private swap via AVNU (its own executor + STRK20 pool — no anonymizer
-// contract of ours required). AVNU has no Sepolia listings, so this only works on Mainnet.
+// contract of ours required). Browsing (token list, prices, chart) always reads live
+// Mainnet market data regardless of the wallet's current chain; executing a trade needs
+// the wallet actually connected to Mainnet, since that's the only chain AVNU can route on.
 // side "buy" sells STRK for the selected token; "sell" sells the selected token for STRK —
 // both are real AVNU routes, just with sellTokenAddress/buyTokenAddress swapped.
 export function useTrade() {
   const myWalletAccount = useStoreWallet((state) => state.myWalletAccount);
   const connectedAddress = useStoreWallet((state) => state.address);
   const myFrontendProviderIndex = useFrontendProvider((state) => state.currentFrontendProviderIndex);
-  const isStrk20Network = constants.Strk20Networks[myFrontendProviderIndex] !== undefined;
-  const avnuConfig = AVNU_CONFIG[myFrontendProviderIndex];
+  const canTrade = myFrontendProviderIndex === 0;
 
   const [tokens, setTokens] = useState<Token[]>([]);
   const [tokensLoading, setTokensLoading] = useState(true);
@@ -67,11 +66,10 @@ export function useTrade() {
   const [result, setResult] = useState<ActionResult | null>(null);
 
   useEffect(() => {
-    if (!avnuConfig) return;
     let cancelled = false;
     setTokensLoading(true);
     setTokensError("");
-    fetchTokens({ tags: ["Verified"], size: 30 }, { baseUrl: avnuConfig.baseUrl })
+    fetchTokens({ tags: ["Verified"], size: 30 }, { baseUrl: MARKET_CONFIG.baseUrl })
       .then((page) => {
         if (cancelled) return;
         const strkHex = num.toHex(TOKEN);
@@ -86,7 +84,7 @@ export function useTrade() {
           .sort((a, b) => (b.lastDailyVolumeUsd ?? 0) - (a.lastDailyVolumeUsd ?? 0));
         setTokens(list);
         setBuyTokenAddress((prev) => prev || list[0]?.address || "");
-        getPrices(list.map((t) => t.address), { baseUrl: avnuConfig.baseUrl })
+        getPrices(list.map((t) => t.address), { baseUrl: MARKET_CONFIG.baseUrl })
           .then((prices) => {
             if (cancelled) return;
             const map: Record<string, number> = {};
@@ -105,7 +103,7 @@ export function useTrade() {
     return () => {
       cancelled = true;
     };
-  }, [avnuConfig, myFrontendProviderIndex]);
+  }, []);
 
   const buyToken = tokens.find((t) => t.address === buyTokenAddress) ?? null;
 
@@ -120,6 +118,10 @@ export function useTrade() {
     setResult(null);
     if (!connectedAddress) {
       setQuoteError("Connect a wallet first.");
+      return;
+    }
+    if (!canTrade) {
+      setQuoteError("Switch your wallet to Starknet Mainnet to trade — AVNU can't route swaps on Sepolia.");
       return;
     }
     if (!buyToken) {
@@ -138,7 +140,7 @@ export function useTrade() {
       const buyTokenAddr = side === "buy" ? buyToken.address : TOKEN;
       const quotes = await getQuotes(
         { sellTokenAddress, buyTokenAddress: buyTokenAddr, sellAmount: amount, takerAddress: connectedAddress },
-        { baseUrl: avnuConfig.baseUrl }
+        { baseUrl: MARKET_CONFIG.baseUrl }
       );
       if (!quotes.length) {
         setQuoteError("No route found for this pair/amount.");
@@ -153,14 +155,14 @@ export function useTrade() {
   };
 
   const swap = async () => {
-    if (!quote || !myWalletAccount || !connectedAddress || !buyToken) return;
+    if (!quote || !myWalletAccount || !connectedAddress || !buyToken || !canTrade) return;
     setSwapping(true);
     setResult({ status: "pending", title: "Building the private swap…" });
     try {
       const prover = createStrk20WalletProver(myWalletAccount as unknown as Parameters<typeof createStrk20WalletProver>[0]);
       const swapResult = await executePrivateSwap(
-        { quote, slippage: 0.005, takerAddress: connectedAddress, poolAddress: avnuConfig.poolAddress, feeMode: { poolFeeToken: TOKEN }, prover },
-        { baseUrl: avnuConfig.baseUrl, paymasterBaseUrl: avnuConfig.paymasterBaseUrl }
+        { quote, slippage: 0.005, takerAddress: connectedAddress, poolAddress: MARKET_CONFIG.poolAddress, feeMode: { poolFeeToken: TOKEN }, prover },
+        { baseUrl: MARKET_CONFIG.baseUrl, paymasterBaseUrl: MARKET_CONFIG.paymasterBaseUrl }
       );
       const txH = swapResult.transactionHash;
       const amountLabel = side === "buy" ? `${amountStr} STRK → ${buyToken.symbol}` : `${amountStr} ${buyToken.symbol} → STRK`;
@@ -181,7 +183,7 @@ export function useTrade() {
   };
 
   return {
-    isStrk20Network,
+    canTrade,
     tokens,
     tokensLoading,
     tokensError,

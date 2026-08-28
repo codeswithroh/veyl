@@ -54,8 +54,10 @@ export default function TradePage() {
         </div>
       </div>
 
-      {!t.tokensLoading && !t.tokensError && t.tokens.length === 0 && (
-        <p className={uni.warn}>AVNU doesn&apos;t list any tokens on Sepolia, so Trade only works on Starknet Mainnet right now. This isn&apos;t a wallet or connection problem on your end.</p>
+      {!t.canTrade && (
+        <p className={uni.warn}>
+          Market data below is always live from Starknet Mainnet. Your wallet is on Sepolia, so browsing works but executing a trade needs Mainnet — switch networks in your wallet when you&apos;re ready to trade.
+        </p>
       )}
       {t.tokensError && <p className={uni.warn}>Couldn&apos;t load tokens: {t.tokensError}</p>}
 
@@ -237,8 +239,8 @@ export default function TradePage() {
                 {t.swapping ? "Swapping…" : t.side === "buy" ? `Buy ${t.buyToken?.symbol ?? ""}` : `Sell ${t.buyToken?.symbol ?? ""}`}
               </button>
             ) : (
-              <button className={uni.btnCta} disabled={t.quoting || !t.isStrk20Network || !t.buyToken} onClick={t.getQuote}>
-                {t.quoting ? "Getting quote…" : "Get quote"}
+              <button className={uni.btnCta} disabled={t.quoting || !t.canTrade || !t.buyToken} onClick={t.getQuote}>
+                {t.quoting ? "Getting quote…" : !t.canTrade ? "Switch to Mainnet to trade" : "Get quote"}
               </button>
             )
           ) : (
