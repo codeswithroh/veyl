@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./dashboard.module.css";
@@ -33,6 +34,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const providerIndex = useFrontendProvider((state) => state.currentFrontendProviderIndex);
   const isConnected = useStoreWallet((state) => state.isConnected);
   const address = useStoreWallet((state) => state.address);
+  const [navOpen, setNavOpen] = useState(false);
 
   const networkLabel = constants.Strk20Networks[providerIndex] ?? "Unsupported network";
   const networkDisplay =
@@ -46,10 +48,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? "Launch"
     : TITLES[pathname ?? ""] ?? "Dashboard";
 
+  // Below the sidebar's collapse breakpoint (see dashboard.module.css), the sidebar
+  // becomes an off-canvas drawer instead of a fixed-width column - without this, on a
+  // narrow/mobile viewport the 240px sidebar squeezed every page's content into a sliver
+  // a few characters wide, wrapping every word onto its own line (the real cause behind
+  // the "huge gaps" the Trade page appeared to have on a phone-width screen).
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
   return (
     <div className={styles.shell}>
       <div className={styles.ambient} aria-hidden />
-      <aside className={styles.sidebar}>
+      {navOpen && <div className={styles.navBackdrop} onClick={() => setNavOpen(false)} aria-hidden />}
+      <aside className={`${styles.sidebar} ${navOpen ? styles.sidebarOpen : ""}`}>
         <Link href="/" className={styles.wordmark}>
           VEYL
         </Link>
@@ -78,7 +90,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className={styles.body}>
         <header className={styles.topbar}>
-          <div>
+          <button className={styles.navToggle} onClick={() => setNavOpen((v) => !v)} aria-label="Toggle navigation">
+            ☰
+          </button>
+          <div className={styles.topbarTitle}>
             <h1>{title}</h1>
             <p>Wired to the real STRK20 privacy pool on {networkDisplay}.</p>
           </div>

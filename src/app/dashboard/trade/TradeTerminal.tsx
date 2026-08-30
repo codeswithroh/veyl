@@ -181,7 +181,7 @@ export default function TradeTerminal() {
               ) : feed.error ? (
                 <div className={styles.chartEmpty}>Couldn&apos;t load price feed: {feed.error}</div>
               ) : (
-                <TokenPriceChart points={feed.points} up={sessionUp} timeframe={timeframe} />
+                <TokenPriceChart points={feed.points} up={sessionUp} />
               )}
 
               <div className={styles.changeChips}>
