@@ -14,6 +14,11 @@
   gap: 16px;
   align-items: start;
 }
+/* Token list collapsed to a thin icon rail — matches the reference's default (collapsed)
+   layout, where the chart claims the freed width instead of a permanent 240px sidebar. */
+.terminalListCollapsed {
+  grid-template-columns: 56px minmax(0, 1fr) 320px;
+}
 @media (max-width: 1100px) {
   .terminal { grid-template-columns: 1fr; }
 }
@@ -31,6 +36,41 @@
 /* ---- Token list (left) ---- */
 .listHead { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; }
 .listHead h3 { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.listExpandBtn {
+  border: none;
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (hover: hover) and (pointer: fine) {
+  .listExpandBtn:hover { color: var(--text); border-color: var(--primary); }
+}
+.tokenListCardCollapsed { padding: 12px 8px; align-items: center; }
+.tokenRailList {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-height: 720px;
+  overflow-y: auto;
+  width: 100%;
+}
+.tokenRailItem {
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+}
 .tokenList {
   display: flex;
   flex-direction: column;

@@ -17,6 +17,7 @@ import TokenPriceChart from "./TokenPriceChart";
 import TokenLogo from "./TokenLogo";
 
 const QUICK_AMOUNTS = ["1", "5", "10", "50"];
+const TOKEN_LIST_COLLAPSE_KEY = "veyl-token-list-collapsed";
 
 function fmtUsd(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
@@ -48,6 +49,9 @@ export default function TradeTerminal() {
   const socials = useTokenSocials(t.buyToken?.extensions?.coingeckoId);
   const balances = useBalances();
   const [search, setSearch] = useState("");
+  // Collapsed by default so the chart gets the width, matching the reference layout — a
+  // thin icon rail instead of an empty page-load flash, restored from localStorage after.
+  const [listCollapsed, setListCollapsed] = useState(true);
   const isConnected = useStoreWallet((s) => s.isConnected);
   const providerIndex = useFrontendProvider((s) => s.currentFrontendProviderIndex);
 
@@ -55,6 +59,27 @@ export default function TradeTerminal() {
     if (isConnected) balances.run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected]);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(TOKEN_LIST_COLLAPSE_KEY);
+      if (stored !== null) setListCollapsed(stored === "1");
+    } catch {
+      /* localStorage unavailable - keep the default */
+    }
+  }, []);
+
+  const toggleListCollapsed = () => {
+    setListCollapsed((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem(TOKEN_LIST_COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const change24h = market.data?.starknet?.usdPriceChangePercentage24h ?? null;
   const up = (change24h ?? 0) >= 0;
@@ -95,45 +120,71 @@ export default function TradeTerminal() {
       )}
       {t.tokensError && <p className={uni.warn}>Couldn&apos;t load tokens: {t.tokensError}</p>}
 
-      <div className={styles.terminal}>
-        {/* Left: token list, sorted by real 24h volume */}
-        <div className={styles.card}>
-          <div className={styles.listHead}>
-            <h3>Tokens</h3>
-          </div>
-          <input
-            className={styles.tokenSearch}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search tokens…"
-            aria-label="Search tokens"
-          />
-          {t.tokensLoading ? (
-            <div className={styles.tokenListEmpty}>Loading tokens…</div>
-          ) : t.tokens.length === 0 ? (
-            <div className={styles.tokenListEmpty}>No tokens available.</div>
-          ) : filteredTokens.length === 0 ? (
-            <div className={styles.tokenListEmpty}>No tokens match &quot;{search}&quot;.</div>
-          ) : (
-            <div className={styles.tokenList}>
-              {filteredTokens.map((tok) => {
-                const price = t.pricesUsd[tok.address];
-                return (
+      <div className={`${styles.terminal} ${listCollapsed ? styles.terminalListCollapsed : ""}`}>
+        {/* Left: token list, sorted by real 24h volume — collapsible to a thin icon rail
+            so the chart can actually claim the width, matching the reference layout. */}
+        <div className={`${styles.card} ${listCollapsed ? styles.tokenListCardCollapsed : ""}`}>
+          {listCollapsed ? (
+            <>
+              <button className={styles.listExpandBtn} onClick={toggleListCollapsed} aria-label="Expand token list" title="Expand token list">
+                »
+              </button>
+              <div className={styles.tokenRailList}>
+                {filteredTokens.map((tok) => (
                   <button
                     key={tok.address}
-                    className={`${styles.tokenRow} ${tok.address === t.buyTokenAddress ? styles.tokenRowActive : ""}`}
+                    className={`${styles.tokenRailItem} ${tok.address === t.buyTokenAddress ? styles.tokenRowActive : ""}`}
                     onClick={() => t.setBuyTokenAddress(tok.address)}
+                    title={`${tok.symbol} — ${tok.name}`}
                   >
                     <TokenLogo src={tok.logoUri} symbol={tok.symbol} size={26} className={styles.tokenLogo} fallbackClassName={styles.tokenLogoFallback} />
-                    <span className={styles.tokenRowText}>
-                      <span className={styles.tokenSymbol}>{tok.symbol}</span>
-                      <span className={styles.tokenName}>{tok.name}</span>
-                    </span>
-                    <span className={styles.tokenPrice}>{price !== undefined ? fmtPrice(price) : "—"}</span>
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={styles.listHead}>
+                <h3>Tokens</h3>
+                <button className={styles.listExpandBtn} onClick={toggleListCollapsed} aria-label="Collapse token list" title="Collapse token list">
+                  «
+                </button>
+              </div>
+              <input
+                className={styles.tokenSearch}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search tokens…"
+                aria-label="Search tokens"
+              />
+              {t.tokensLoading ? (
+                <div className={styles.tokenListEmpty}>Loading tokens…</div>
+              ) : t.tokens.length === 0 ? (
+                <div className={styles.tokenListEmpty}>No tokens available.</div>
+              ) : filteredTokens.length === 0 ? (
+                <div className={styles.tokenListEmpty}>No tokens match &quot;{search}&quot;.</div>
+              ) : (
+                <div className={styles.tokenList}>
+                  {filteredTokens.map((tok) => {
+                    const price = t.pricesUsd[tok.address];
+                    return (
+                      <button
+                        key={tok.address}
+                        className={`${styles.tokenRow} ${tok.address === t.buyTokenAddress ? styles.tokenRowActive : ""}`}
+                        onClick={() => t.setBuyTokenAddress(tok.address)}
+                      >
+                        <TokenLogo src={tok.logoUri} symbol={tok.symbol} size={26} className={styles.tokenLogo} fallbackClassName={styles.tokenLogoFallback} />
+                        <span className={styles.tokenRowText}>
+                          <span className={styles.tokenSymbol}>{tok.symbol}</span>
+                          <span className={styles.tokenName}>{tok.name}</span>
+                        </span>
+                        <span className={styles.tokenPrice}>{price !== undefined ? fmtPrice(price) : "—"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
 
