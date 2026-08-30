@@ -29,12 +29,29 @@ const TITLES: Record<string, string> = {
   "/dashboard/balances": "Balances",
 };
 
+const SIDEBAR_COLLAPSE_KEY = "veyl-sidebar-collapsed";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const providerIndex = useFrontendProvider((state) => state.currentFrontendProviderIndex);
   const isConnected = useStoreWallet((state) => state.isConnected);
   const address = useStoreWallet((state) => state.address);
   const [navOpen, setNavOpen] = useState(false);
+  // Collapsed by default (icon-only rail) so the terminal gets the width, matching the
+  // reference layout's own collapsible left panel - only expanded if the user asks.
+  const [collapsed, setCollapsed] = useState(true);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
+    if (stored !== null) setCollapsed(stored === "1");
+  }, []);
+  const toggleCollapsed = () => {
+    setCollapsed((v) => {
+      const next = !v;
+      window.localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? "1" : "0");
+      return next;
+    });
+  };
 
   const networkLabel = constants.Strk20Networks[providerIndex] ?? "Unsupported network";
   const networkDisplay =
@@ -61,29 +78,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className={styles.shell}>
       <div className={styles.ambient} aria-hidden />
       {navOpen && <div className={styles.navBackdrop} onClick={() => setNavOpen(false)} aria-hidden />}
-      <aside className={`${styles.sidebar} ${navOpen ? styles.sidebarOpen : ""}`}>
-        <Link href="/" className={styles.wordmark}>
-          VEYL
-        </Link>
+      <aside className={`${styles.sidebar} ${navOpen ? styles.sidebarOpen : ""} ${collapsed ? styles.sidebarCollapsed : ""}`}>
+        <div className={styles.sideTop}>
+          <Link href="/" className={styles.wordmark}>
+            {collapsed ? "V" : "VEYL"}
+          </Link>
+          <button className={styles.collapseToggle} onClick={toggleCollapsed} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            {collapsed ? "»" : "«"}
+          </button>
+        </div>
         <nav className={styles.sideNav}>
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={`${styles.sideNavItem} ${isActive(item.href) ? styles.sideNavItemActive : ""}`}
+              title={collapsed ? item.label : undefined}
             >
               <span className={styles.sideNavIcon}>{item.icon}</span>
-              {item.label}
+              <span className={styles.navLabel}>{item.label}</span>
             </Link>
           ))}
         </nav>
         <div className={styles.sideFoot}>
           <Link href="/" className={styles.backLink}>
-            ← Back to site
+            <span className={styles.navLabel}>← Back to site</span>
+            {collapsed && "←"}
           </Link>
           <div className={styles.networkBadge}>
             <span className={styles.networkDot} />
-            {networkDisplay}
+            <span className={styles.navLabel}>{networkDisplay}</span>
           </div>
         </div>
       </aside>

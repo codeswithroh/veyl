@@ -35,6 +35,7 @@
   top: 0;
   height: 100dvh;
 }
+.sideTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .wordmark {
   font-family: var(--font-display), sans-serif;
   font-weight: 800;
@@ -43,6 +44,21 @@
   color: var(--text);
   padding: 0 8px;
 }
+.collapseToggle {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.collapseToggle:hover { color: var(--text); border-color: var(--primary); }
 .sideNav {
   display: flex;
   flex-direction: column;
@@ -100,6 +116,21 @@
   border-radius: 50%;
   background: var(--green);
   flex: none;
+}
+
+/* Collapsed rail: icon-only, default state on desktop so the terminal gets the width -
+   matches the reference's own collapsible left panel. Scoped to the sidebar's own
+   persistent-column breakpoint; the mobile drawer below always shows full labels
+   regardless of this state. */
+@media (min-width: 901px) {
+  .sidebarCollapsed { width: 72px; flex: 0 0 72px; padding: 28px 12px; }
+  .sidebarCollapsed .sideTop { justify-content: center; }
+  .sidebarCollapsed .wordmark { padding: 0; }
+  .sidebarCollapsed .sideNavItem { justify-content: center; padding: 10px 0; border-left: none; }
+  .sidebarCollapsed .sideNavItemActive { border-radius: 10px; }
+  .sidebarCollapsed .navLabel { display: none; }
+  .sidebarCollapsed .backLink { display: flex; justify-content: center; }
+  .sidebarCollapsed .networkBadge { justify-content: center; padding: 8px; }
 }
 
 /* ---- Body ---- */
