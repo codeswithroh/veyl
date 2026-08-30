@@ -1,5 +1,6 @@
 "use client";
 
+import { walletV6, constants as SNconstants } from "starknet";
 import type { WALLET_API } from "@starknet-io/types-js";
 import * as constants from "@/utils/constants";
 import { useStoreWallet } from "../../Wallet/walletContext";
@@ -13,6 +14,7 @@ import { ActionResult, errorResult, receiptToResult, shortHex, supportsStrk20Act
 export function useSubmit() {
   const myWalletAccount = useStoreWallet((state) => state.myWalletAccount);
   const walletApiList = useStoreWallet((state) => state.walletApiList);
+  const starknetWalletObject = useStoreWallet((state) => state.StarknetWalletObject);
   const myFrontendProviderIndex = useFrontendProvider((state) => state.currentFrontendProviderIndex);
 
   async function submit(
@@ -54,18 +56,39 @@ export function useSubmit() {
         { label: "Transaction", value: shortHex(txH), hash: txH },
       ],
     });
-    // myWalletAccount.provider is fixed at connect time (Sepolia) and can point at the
-    // wrong network; use the frontend provider that tracks the current network instead.
-    const provider = constants.myFrontendProviders[myFrontendProviderIndex];
+    // myWalletAccount.provider is fixed at connect time and can go stale the same way
+    // currentFrontendProviderIndex can: if the user switches networks in their wallet
+    // mid-session without reconnecting, both still point at whatever network was active at
+    // connect time. Re-check the wallet's actual current chain right before polling, so a
+    // mid-session switch doesn't leave us polling the wrong network for a transaction that
+    // already confirmed elsewhere (exactly what "shielding succeeded, button never updated"
+    // looks like — it wasn't hanging, it was asking the wrong chain forever).
+    let providerIndex = myFrontendProviderIndex;
+    if (starknetWalletObject) {
+      try {
+        const liveChainId = (await walletV6.requestChainId(starknetWalletObject)) as string;
+        providerIndex = liveChainId === SNconstants.StarknetChainId.SN_MAIN ? 0 : 2;
+      } catch {
+        /* fall back to the last-known provider index if the wallet won't answer this */
+      }
+    }
+    const provider = constants.myFrontendProviders[providerIndex];
     try {
-      const txR = await provider.waitForTransaction(txH, { retries: 400, retryInterval: 3000 });
+      // ~4 minutes, not the ~20 the old retry count implied — long past that, silently
+      // continuing to poll isn't "still confirming", it's the wrong network or a stuck tx;
+      // either way the user needs the actual error, not an endlessly spinning button.
+      const txR = await provider.waitForTransaction(txH, { retries: 80, retryInterval: 3000 });
       setResult(receiptToResult(txR, txH, amountLabel));
     } catch (error: any) {
       setResult({
         status: "error",
-        title: "Could not confirm transaction",
+        title: "Not confirmed after 4 minutes",
         rows: [{ label: "Transaction", value: shortHex(txH), hash: txH }],
-        note: error?.message ?? error?.toString?.() ?? String(error),
+        note:
+          `${error?.message ?? error?.toString?.() ?? String(error)}\n\n` +
+          `If your wallet shows this succeeded, it likely confirmed on a different network ` +
+          `than this page is tracking — check the transaction hash above on the right ` +
+          `network's explorer directly.`,
       });
     }
     return txH;
