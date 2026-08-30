@@ -132,17 +132,31 @@ export function balancesToResult(raw: any): ActionResult {
 
 // Wallet-API error codes (@starknet-io/types-js's wallet-api/errors.ts) that have a real,
 // actionable fix on the user's side - mapped to plain-language guidance instead of the raw
-// code. NOT_REGISTERED specifically: per strk20-by-example.org, "wallets handle registration
-// on first use" transparently - a wallet that hasn't completed any private action yet
-// should auto-register itself on the next one, but evidently doesn't for every action shape
-// (this surfaced on Commit, a withdraw+invoke bundle). The one action reliably simple enough
-// to trigger it is a plain Shield deposit.
+// code.
+//
+// NOT_REGISTERED: per the spec's own doc comment on wallet_strk20InvokeTransaction,
+// "Registration into the pool is transparent" - the wallet is supposed to silently
+// register the account on this very call, no separate step needed. It surfaced here on a
+// plain Shield deposit - the simplest possible STRK20 action (self-only, no counterparty) -
+// which rules out the "do a simpler action first" theory this message used to suggest
+// (that advice was wrong: if Shield itself throws this, there's no simpler action to fall
+// back to). What's actually left, in order of likelihood:
+//  1. The connected Starknet account has never sent a single transaction and isn't deployed
+//     on-chain yet - some wallets only trigger account deployment on a plain transfer, not
+//     on a privacy action. A trivial regular transaction (e.g. send a small amount to
+//     yourself) forces deployment.
+//  2. A bug/gap in this specific wallet build's registration handling - not something this
+//     app can work around, since the STRK20_ACTION spec has no explicit "register" action
+//     for a dapp to send itself.
 function friendlyWalletError(msg: string): string {
   if (/NOT_REGISTERED/i.test(msg)) {
     return (
-      `${msg}\n\nYour wallet hasn't registered with the privacy pool yet — this happens ` +
-      `automatically the first time you complete a simple private action. Go to Shield and ` +
-      `deposit any amount first, then come back and try this again.`
+      `${msg}\n\nThis should happen automatically (the wallet is supposed to silently ` +
+      `register you on this exact call) - it not doing so here is outside what this app ` +
+      `controls. Two things worth trying: (1) if this wallet has never sent any Starknet ` +
+      `transaction before, send a small plain transfer first to force account deployment, ` +
+      `then retry; (2) update the wallet extension to its latest version, since this looks ` +
+      `like a wallet-side registration bug rather than anything wrong with what Veyl sent.`
     );
   }
   return msg;
