@@ -58,8 +58,15 @@ export default function TokenPriceChart({
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    const chart = createChart(containerRef.current, {
+    const container = containerRef.current;
+    if (!container) return;
+    // lightweight-charts' built-in autoSize can measure the container before the
+    // surrounding grid/flex layout has finished settling (it did here: the chart locked
+    // to 280x320 inside a 770x460 box and never re-measured), so size it explicitly off
+    // a ResizeObserver instead of trusting autoSize alone.
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: "#8f8a86",
@@ -72,7 +79,6 @@ export default function TokenPriceChart({
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
       crosshair: { mode: CrosshairMode.Normal },
-      autoSize: true,
     });
     const series = chart.addSeries(AreaSeries, {
       lineWidth: 2,
@@ -81,7 +87,17 @@ export default function TokenPriceChart({
     });
     chartRef.current = chart;
     seriesRef.current = series;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) chart.resize(width, height);
+    });
+    resizeObserver.observe(container);
+
     return () => {
+      resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
