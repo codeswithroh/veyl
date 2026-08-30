@@ -130,8 +130,26 @@ export function balancesToResult(raw: any): ActionResult {
   return { status: "ok", title: "Shielded balances", note: json.stringify(r, undefined, 2) };
 }
 
+// Wallet-API error codes (@starknet-io/types-js's wallet-api/errors.ts) that have a real,
+// actionable fix on the user's side - mapped to plain-language guidance instead of the raw
+// code. NOT_REGISTERED specifically: per strk20-by-example.org, "wallets handle registration
+// on first use" transparently - a wallet that hasn't completed any private action yet
+// should auto-register itself on the next one, but evidently doesn't for every action shape
+// (this surfaced on Commit, a withdraw+invoke bundle). The one action reliably simple enough
+// to trigger it is a plain Shield deposit.
+function friendlyWalletError(msg: string): string {
+  if (/NOT_REGISTERED/i.test(msg)) {
+    return (
+      `${msg}\n\nYour wallet hasn't registered with the privacy pool yet — this happens ` +
+      `automatically the first time you complete a simple private action. Go to Shield and ` +
+      `deposit any amount first, then come back and try this again.`
+    );
+  }
+  return msg;
+}
+
 export function errorResult(msg: string): ActionResult {
-  return { status: "error", title: "Action failed", note: msg };
+  return { status: "error", title: "Action failed", note: friendlyWalletError(msg) };
 }
 
 // STRK20 private-DeFi actions (deposit/withdraw/transfer/invoke) require Wallet API
