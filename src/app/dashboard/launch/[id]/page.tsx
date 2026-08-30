@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import { num } from "starknet";
 import styles from "../launch.module.css";
 import uni from "../../../uni.module.css";
 import SelectWallet from "../../../components/client/WalletHandle/SelectWallet";
@@ -51,7 +52,13 @@ export default function LaunchDetailPage({ params }: { params: Promise<{ id: str
             </span>
           </div>
           {r.metadata?.description && <p className={styles.detailDesc}>{r.metadata.description}</p>}
-          {r.metadata?.creator && <div className={styles.detailCreator}>Created by {shortHex(r.metadata.creator)}</div>}
+          {r.metadata?.is_private ? (
+            <div className={styles.detailCreator}>🔒 Created privately — no creator address recorded</div>
+          ) : (
+            r.metadata?.creator && num.toBigInt(r.metadata.creator) !== 0n && (
+              <div className={styles.detailCreator}>Created by {shortHex(r.metadata.creator)}</div>
+            )
+          )}
         </div>
       </div>
 

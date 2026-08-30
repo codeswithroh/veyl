@@ -41,7 +41,14 @@ export function useLaunchList(providerIndex: number) {
         let metadata: RoundMetadata | null = null;
         try {
           const m: any = await contract.call("get_round_metadata", [id]);
-          metadata = { creator: num.toHex(m.creator), name: m.name, symbol: m.symbol, description: m.description, image_url: m.image_url };
+          metadata = {
+            creator: num.toHex(m.creator),
+            is_private: Boolean(m.is_private),
+            name: m.name,
+            symbol: m.symbol,
+            description: m.description,
+            image_url: m.image_url,
+          };
         } catch {
           metadata = null; // pre-metadata round, or read failed — still show it with raw numbers
         }

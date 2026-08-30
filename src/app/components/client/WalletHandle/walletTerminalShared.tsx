@@ -34,7 +34,7 @@ export function parseUnits(input: string, decimals: number): bigint | null {
 // API spec (@starknet-io/types-js) requires 0x-prefixed hex matching
 // ^0x(0|[a-fA-F1-9][a-fA-F0-9]{0,62})$ — no leading zero digits, and NOT plain decimal.
 // num.toHex() already produces this canonical form for a bigint.
-export function felt(value: bigint | string): string {
+export function felt(value: bigint | number | string): string {
   return num.toHex(num.toBigInt(value));
 }
 

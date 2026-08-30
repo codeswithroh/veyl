@@ -48,15 +48,14 @@ export const Strk20Networks: Record<number, string> = { 0: "MAINNET", 2: "SEPOLI
 // UNAUDITED, Sepolia-only for now. See cairo/README.md and STRK20_INTEGRATION_PLAN.md
 // §7 before pointing a real launch at this.
 
-// Redeployed 2026-08-26: create_round is now permissionless (any wallet can launch,
-// atomically funding the round with their own tokens in the same call) and Round gained
-// on-chain display metadata (name/symbol/description/image_url via get_round_metadata) —
-// see cairo/address.md and cairo/README.md. Builds on the claim-path fixes verified end to
-// end on 2026-08-24 (ZERO_AMOUNT, pool fee approval, commit surplus tolerance), unchanged
-// here. Real Sepolia STRK20 pool wired as pool_address. "0x0" = not deployed on this
-// network (mainnet: no deployment yet, needs its own explicit go after a real audit — see
+// Redeployed 2026-08-31: adds privacy_invoke_create_round, the private counterpart to
+// create_round — called by the pool (not the creator's wallet), so no creator address is
+// ever recorded (RoundMetadata gained is_private). See cairo/address.md and cairo/README.md
+// "Mainnet deployment" for why this exists. Builds on the 2026-08-26 permissionless
+// create_round, unchanged here. "0x0" = not deployed on this network (mainnet: no
+// deployment yet, needs its own explicit go after a real audit — see
 // STRK20_INTEGRATION_PLAN.md §7).
-export const FairLaunchAnonymizerSepolia = "0x0328a81887f0eaa960b95579c9caf1ef596cf40c331f95117ed365b8ed42d6a2";
+export const FairLaunchAnonymizerSepolia = "0x033364f081e7dea882063392be7078696a6d50d3d80f8945355c006e366e267e";
 export const FairLaunchAnonymizerMainnet = "0x0";
 
 // Resolve the fair-launch anonymizer for a frontend provider index (0 = Mainnet, 2 = Sepolia).
@@ -137,6 +136,7 @@ export const FairLaunchAnonymizerAbi = [
         name: "strk20_invoke_helper::RoundMetadata",
         members: [
             { name: "creator", type: "core::starknet::contract_address::ContractAddress" },
+            { name: "is_private", type: "core::bool" },
             { name: "name", type: "core::byte_array::ByteArray" },
             { name: "symbol", type: "core::byte_array::ByteArray" },
             { name: "description", type: "core::byte_array::ByteArray" },

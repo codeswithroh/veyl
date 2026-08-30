@@ -13,10 +13,11 @@ import * as constants from "@/utils/constants";
 
 export default function CreateLaunchPage() {
   const router = useRouter();
-  const { create, result, step, createdRoundId } = useCreateLaunch();
+  const { create, createPrivate, result, step, createdRoundId } = useCreateLaunch();
   const isConnected = useStoreWallet((s) => s.isConnected);
   const providerIndex = useFrontendProvider((s) => s.currentFrontendProviderIndex);
 
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
@@ -32,7 +33,12 @@ export default function CreateLaunchPage() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    create({ launchToken, priceStrk: price, totalSupply, ticketSizeStrk: ticketSize, commitDays, revealDays, name, symbol, description, imageUrl });
+    const input = { launchToken, priceStrk: price, totalSupply, ticketSizeStrk: ticketSize, commitDays, revealDays, name, symbol, description, imageUrl };
+    if (visibility === "private") {
+      createPrivate(input);
+    } else {
+      create(input);
+    }
   };
 
   return (
@@ -40,8 +46,37 @@ export default function CreateLaunchPage() {
       <div className={styles.head}>
         <div className={styles.headText}>
           <h2>Create launch</h2>
-          <p>Permissionless — anyone can open a round. You'll approve the contract to pull your total supply, then create the round in one more signature.</p>
+          <p>Permissionless — anyone can open a round.</p>
         </div>
+      </div>
+
+      <div className={styles.formCard}>
+        <span className={styles.formSectionTitle}>Visibility</span>
+        <div className={styles.visibilityTabs}>
+          <button
+            type="button"
+            className={`${styles.visibilityTab} ${visibility === "public" ? styles.visibilityTabActive : ""}`}
+            onClick={() => setVisibility("public")}
+          >
+            Public
+          </button>
+          <button
+            type="button"
+            className={`${styles.visibilityTab} ${visibility === "private" ? styles.visibilityTabActive : ""}`}
+            onClick={() => setVisibility("private")}
+          >
+            Private
+          </button>
+        </div>
+        {visibility === "public" ? (
+          <span className={styles.formHint}>
+            You'll approve the contract to pull your total supply from your public wallet, then create the round in one more signature. Your wallet address is recorded as the creator, publicly visible.
+          </span>
+        ) : (
+          <span className={styles.formHint}>
+            No creator address is ever recorded. Requires the launch token to already be shielded in your privacy pool balance (Shield it first if you haven't) — it's withdrawn straight into the round in one signature, with the privacy pool itself as the on-chain caller instead of your wallet.
+          </span>
+        )}
       </div>
 
       <div className={styles.formCard}>
@@ -116,7 +151,15 @@ export default function CreateLaunchPage() {
 
       {isConnected ? (
         <button className={uni.btnCta} disabled={busy} type="submit">
-          {step === "approving" ? "Approving…" : step === "creating" ? "Creating launch…" : "Create launch"}
+          {step === "approving"
+            ? "Approving…"
+            : step === "creating"
+            ? visibility === "private"
+              ? "Creating privately…"
+              : "Creating launch…"
+            : visibility === "private"
+            ? "Create privately"
+            : "Create launch"}
         </button>
       ) : (
         <SelectWallet variant="ctaBig" />

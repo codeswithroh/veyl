@@ -24,6 +24,7 @@ export type FairLaunchRound = {
 
 export type RoundMetadata = {
   creator: string;
+  is_private: boolean;
   name: string;
   symbol: string;
   description: string;
@@ -114,6 +115,7 @@ export function useFairLaunchRound(roundId: bigint) {
         !cancelled &&
         setMetadata({
           creator: num.toHex(m.creator),
+          is_private: Boolean(m.is_private),
           name: m.name,
           symbol: m.symbol,
           description: m.description,

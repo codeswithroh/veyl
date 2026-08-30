@@ -8,6 +8,8 @@ Phase 3, goal #2). Replaces the round-trip echo demo that used to live in `src/l
 **⚠️ UNAUDITED.** This is a first draft for testnet iteration. Per the integration plan, Veyl
 owns review, audit, deployment, and maintenance of this contract — no third party does that for
 Veyl. Do not deploy to mainnet, and do not point a real launch at it, before a real audit.
+**If you're reading this because a Mainnet round is already live: that was a deliberate,
+explicit decision to accept this risk, not an oversight — see "Mainnet deployment" below.**
 
 ## Why fixed tickets, not variable bids
 
@@ -173,12 +175,85 @@ with 3 STRK (fee-coverage buffer) right after deploy.
 All five steps run through the real Sepolia STRK20 privacy pool (not `snforge` mocks) via the
 one-off scripts in `server/scripts/fair-launch-commit.ts` / `fair-launch-claim.ts`.
 
+## Mainnet deployment
+
+**Status: explicitly requested by the project owner, 2026-08-31, against the audit gate above.**
+No audit has happened. The decision to deploy anyway was made knowingly, after this exact
+warning was surfaced — recorded here so it's never mistaken for an oversight later.
+
+Claude does not (and will not) hold or use a mainnet private key, and does not execute the
+actual declare/deploy transactions itself — those spend real STRK and create a real,
+funds-holding contract, which is the account owner's call to make with their own wallet.
+This section is the runbook for whoever does run it.
+
+**1. One-time setup**
+
+```bash
+# Create (or import) a funded mainnet account for sncast - keeps the key in sncast's own
+# local keystore, never in this repo or in any chat transcript.
+sncast account create --name veyl-mainnet --network mainnet
+# fund the account address it prints, then:
+sncast account deploy --name veyl-mainnet --network mainnet
+```
+
+Edit `cairo/snfoundry.toml`'s `[sncast.veyl-mainnet]` `url` to your own mainnet RPC endpoint
+(Alchemy/Infura/Blast, or a public gateway) — it's left as a placeholder on purpose.
+
+**2. Build**
+
+```bash
+cd cairo && scarb build
+```
+
+**3. Declare**
+
+```bash
+sncast --profile veyl-mainnet declare --contract-name FairLaunchAnonymizer
+```
+
+Note the returned `class_hash`. If a class with the same hash is already declared (e.g. by
+someone else, or a prior attempt), `sncast` will tell you and you can skip straight to deploy
+with that hash.
+
+**4. Deploy**
+
+Constructor is `(admin, strk_token, pool_address)` — `admin` is vestigial (nothing reads it
+post-permissionless-`create_round`, kept only because changing the constructor signature
+wasn't worth a redeploy) but still required by the ABI; pass your own deployer address.
+
+```bash
+sncast --profile veyl-mainnet deploy \
+  --class-hash <CLASS_HASH_FROM_STEP_3> \
+  --constructor-calldata <YOUR_DEPLOYER_ADDRESS> 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d 0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a
+```
+
+(`0x04718...` = real Mainnet STRK; `0x040337...` = the real Mainnet STRK20 privacy pool —
+both from `@avnu/avnu-sdk`'s exported `PRIVACY_POOL_ADDRESS`, verified against the SDK source
+directly, not guessed.)
+
+**5. Fund the fee-coverage buffer**
+
+Same reason as the Sepolia deploy (see "Live pool-mediated round — full verification" above):
+`_claim` pays the pool's own per-open-note fee on top of the payout, and nothing in
+`create_round` funds that. Send a small STRK buffer (a few STRK) directly to the deployed
+contract address right after deploy, before pointing any real round at it.
+
+**6. Wire it into the app**
+
+Give Claude (or edit directly) the resulting class hash + contract address — updates needed:
+`src/utils/constants.ts`'s `FairLaunchAnonymizerMainnet` (currently `"0x0"`, a placeholder
+already waiting for this), plus a new entry in [`address.md`](address.md) and this file,
+matching the existing Sepolia deployment's documentation format.
+
 ## Not yet done
 
-- A real audit before any mainnet round — this contract is unaudited, full stop.
-- Mainnet deployment — separate step, needs its own explicit go-ahead, only after that audit.
+- A real audit — still not done, deployment above proceeded without it at explicit request.
 - Verify a wallet-signed (not script-signed) round through the actual dashboard UI with a real
   browser wallet extension — everything above was driven by scripts holding the account key
   directly, not through `WalletAccountV6Tag.tsx`'s wallet-connect flow.
 - Verify an oversubscribed (pro-rata, nonzero refund) round against the real pool — only
   full-fill/zero-refund has been run live so far; the pro-rata math is only `snforge`-tested.
+- Verify `privacy_invoke_create_round` (private launch creation, added 2026-08-31) against
+  the real pool end to end — currently only `snforge`-tested (creator hidden, non-pool
+  caller rejected, underfunded call rejected). The frontend's Public/Private toggle
+  (`useCreateLaunch.ts`'s `createPrivate`) has not been exercised with a real wallet yet.

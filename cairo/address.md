@@ -91,3 +91,41 @@ completely unrelated address with its own freshly-minted token (see
 themselves are unchanged from the fully-verified round above and were not re-run live on
 this new instance — the claim-path fixes they exercise live in `_commit`/`_claim`, neither
 of which this change touched.
+
+**Superseded (2026-08-31 — no private round-creation path):** the instance above
+(`0x0328a81887f0eaa960b95579c9caf1ef596cf40c331f95117ed365b8ed42d6a2`) only had the public
+`create_round`, so every launch's creator address was necessarily public. Replaced to add a
+private path — see current entry below.
+
+**Current — FairLaunchAnonymizer, redeployed 2026-08-31, adds privacy_invoke_create_round
+(private round creation):**
+
+contract class hash : 0x3247d25e3a8f45806dffe660966a7e182797df3d384026774e1cf6ee747228d
+
+contract address (sepolia) : 0x033364f081e7dea882063392be7078696a6d50d3d80f8945355c006e366e267e
+
+constructor args : same as above (admin/strk_token/pool_address)
+
+**What changed:** added `privacy_invoke_create_round` — called by the pool (same
+`assert(caller == pool_address)` gate as `_commit`/`_claim`), never the creator's own
+wallet, so no creator address ever reaches this contract. The launch token must already be
+withdrawn from the creator's shielded balance into this contract before the call (verified
+via a new `pending_launch_token_escrow` per-token balance-delta check, the same pattern
+`_commit` uses for STRK, generalized to an arbitrary token since the launch token differs
+per round). `RoundMetadata` gained `is_private: bool`; when true, `creator` is left zero.
+The existing public `create_round` is unchanged in behavior (still sets `is_private: false`,
+still records the real caller) — both paths now share a common `_create_round` internal that
+only allocates the round id and writes state, funding/validation still happens in each
+caller before that runs.
+
+Funded with 3 STRK directly (fee-coverage buffer, same reason as every prior redeploy) right
+after deploy.
+
+**Verified for real on Sepolia:** funded the deployer account via the public Starknet
+Foundation faucet (100 STRK), declared, deployed, and fee-buffer-funded. `snforge` covers
+the private path with three new tests: `test_privacy_invoke_create_round_hides_creator`
+(creator stays zero, `is_private` true), `test_privacy_invoke_create_round_rejects_non_pool_caller`
+(`BAD_POOL`), `test_privacy_invoke_create_round_rejects_underfunded_call` (`FUNDING_FAILED`)
+— all 9 tests (6 prior + 3 new) pass. A live end-to-end private round creation through the
+real pool (wallet-signed, via the dashboard UI's new Public/Private toggle) has not yet been
+run — see cairo/README.md "Not yet done".

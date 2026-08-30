@@ -17,6 +17,18 @@
 //! escrow in, open-note settlement out); `reveal` and `finalize` never move funds, so they
 //! stay plain entrypoints.
 //!
+//! Two ways to create a round: `create_round` is a plain public call — the caller's own
+//! address ends up as the transaction sender and is recorded as `RoundMetadata.creator`, so
+//! anyone can see who launched it. `privacy_invoke_create_round` is the private path: the
+//! pool calls it (same relay pattern as commit/claim), the launch token must already have
+//! been withdrawn from the creator's *shielded* balance into this contract before the call
+//! (mirroring `_commit`'s pre-funded-ticket pattern, generalized to an arbitrary token via
+//! `pending_launch_token_escrow`), and no creator address is ever recorded
+//! (`RoundMetadata.creator` is left zero, `is_private` is set true). The tradeoff this can't
+//! remove: the creator's *first* Shield deposit of the launch token is still a public,
+//! identity-revealing transaction from their own wallet — privacy here starts from the
+//! shielded balance forward, not retroactively to wherever the tokens originally came from.
+//!
 //! `bid_id` vs. open note ids — two different id spaces, don't conflate them: `bid_id` is
 //! a caller-chosen felt252 that stays stable across the *separate* commit/reveal/claim
 //! transactions (potentially days apart) so this contract can look up a bidder's state.
@@ -77,7 +89,10 @@ pub struct Round {
 // read-modify-write in this file).
 #[derive(Drop, Serde, starknet::Store)]
 pub struct RoundMetadata {
+    // Zero when `is_private` — `privacy_invoke_create_round` never learns a real creator
+    // identity to record, by design.
     pub creator: ContractAddress,
+    pub is_private: bool,
     pub name: ByteArray,
     pub symbol: ByteArray,
     pub description: ByteArray,
@@ -102,6 +117,29 @@ pub trait IFairLaunchAnonymizer<TState> {
     /// docs — those note ids are NOT `bid_id`).
     fn privacy_invoke(
         ref self: TState, round_id: u64, bid_id: felt252, action: FairLaunchAction,
+    ) -> Span<OpenNoteDeposit>;
+
+    /// The private counterpart to `create_round`: called by the privacy pool, not the
+    /// creator's own wallet, so no creator address ever reaches this contract. The pool
+    /// must have already withdrawn exactly `total_supply` of `launch_token` from the
+    /// creator's shielded balance into this contract in the same atomic multicall, before
+    /// this call — verified here as a balance-delta check against
+    /// `pending_launch_token_escrow`, the same pattern `_commit` uses for STRK, generalized
+    /// to an arbitrary token since the launch token differs per round. Returns an empty
+    /// span (matches `_commit`'s no-payout return) — this call moves no funds out, it only
+    /// records a round that's already funded.
+    fn privacy_invoke_create_round(
+        ref self: TState,
+        launch_token: ContractAddress,
+        price: u128,
+        total_supply: u128,
+        ticket_size: u128,
+        commit_end: u64,
+        reveal_end: u64,
+        name: ByteArray,
+        symbol: ByteArray,
+        description: ByteArray,
+        image_url: ByteArray,
     ) -> Span<OpenNoteDeposit>;
 
     /// Permissionless: anyone can open a round for any token they hold. Pulls exactly
@@ -188,6 +226,13 @@ mod FairLaunchAnonymizer {
         // just-deposited delta from this call rather than trusting the anonymizer's raw
         // balance (which also holds every other round's unclaimed escrow).
         total_escrowed: u128,
+        // Same idea as `total_escrowed`, but per-token and for `privacy_invoke_create_round`
+        // specifically: how much of a given launch token this contract expects to be
+        // holding from already-recorded private-round creations, so a later round's delta
+        // check isn't confused by an earlier round's balance. Kept separate from
+        // `total_escrowed` (STRK-only, commit/claim path) rather than merged, so this new
+        // path can't touch the already-live-verified commit/claim accounting.
+        pending_launch_token_escrow: Map<ContractAddress, u128>,
     }
 
     #[event]
@@ -275,6 +320,53 @@ mod FairLaunchAnonymizer {
             }
         }
 
+        fn privacy_invoke_create_round(
+            ref self: ContractState,
+            launch_token: ContractAddress,
+            price: u128,
+            total_supply: u128,
+            ticket_size: u128,
+            commit_end: u64,
+            reveal_end: u64,
+            name: ByteArray,
+            symbol: ByteArray,
+            description: ByteArray,
+            image_url: ByteArray,
+        ) -> Span<OpenNoteDeposit> {
+            let caller = get_caller_address();
+            assert(caller == self.pool_address.read(), errors::BAD_POOL);
+
+            // The pool already withdrew total_supply of launch_token from the creator's
+            // shielded balance before invoking us (withdraw < invoke, same ordering
+            // `_commit` relies on for STRK) — verify that against a per-token running
+            // total rather than raw balance, since the balance may also hold other
+            // rounds' escrow for the same token.
+            let launch = IErc20Dispatcher { contract_address: launch_token };
+            let balance: u256 = launch.balance_of(get_contract_address());
+            let prior: u128 = self.pending_launch_token_escrow.entry(launch_token).read();
+            let delta: u256 = balance - prior.into();
+            let delta_u128: u128 = delta.try_into().expect('DELTA_OVERFLOW');
+            assert(delta_u128 >= total_supply, errors::FUNDING_FAILED);
+            self.pending_launch_token_escrow.entry(launch_token).write(prior + delta_u128);
+
+            self
+                ._create_round(
+                    Zero::zero(),
+                    true,
+                    launch_token,
+                    price,
+                    total_supply,
+                    ticket_size,
+                    commit_end,
+                    reveal_end,
+                    name,
+                    symbol,
+                    description,
+                    image_url,
+                );
+            array![].span()
+        }
+
         fn create_round(
             ref self: ContractState,
             launch_token: ContractAddress,
@@ -288,12 +380,6 @@ mod FairLaunchAnonymizer {
             description: ByteArray,
             image_url: ByteArray,
         ) -> u64 {
-            assert(launch_token.is_non_zero(), errors::ZERO_TOKEN);
-            assert(price != 0, errors::ZERO_PRICE);
-            assert(total_supply != 0, errors::ZERO_SUPPLY);
-            assert(ticket_size != 0, errors::ZERO_TICKET);
-            assert(commit_end < reveal_end, errors::BAD_DEADLINES);
-
             let creator = get_caller_address();
             // Pull the creator's own tokens atomically, in this same call, rather than
             // trusting a separate "please fund this before anyone claims" step — the
@@ -303,43 +389,21 @@ mod FairLaunchAnonymizer {
                 .transfer_from(creator, get_contract_address(), total_supply.into());
             assert(funded, errors::FUNDING_FAILED);
 
-            let round_id = self.next_round_id.read();
-            self.next_round_id.write(round_id + 1);
             self
-                .rounds
-                .entry(round_id)
-                .write(
-                    Round {
-                        launch_token,
-                        price,
-                        total_supply,
-                        ticket_size,
-                        commit_end,
-                        reveal_end,
-                        revealed_count: 0,
-                        finalized: false,
-                        clearing_num: 0,
-                        clearing_den: 0,
-                    },
-                );
-            self
-                .round_metadata
-                .entry(round_id)
-                .write(RoundMetadata { creator, name, symbol, description, image_url });
-            self
-                .emit(
-                    RoundCreated {
-                        round_id,
-                        creator,
-                        launch_token,
-                        price,
-                        total_supply,
-                        ticket_size,
-                        commit_end,
-                        reveal_end,
-                    },
-                );
-            round_id
+                ._create_round(
+                    creator,
+                    false,
+                    launch_token,
+                    price,
+                    total_supply,
+                    ticket_size,
+                    commit_end,
+                    reveal_end,
+                    name,
+                    symbol,
+                    description,
+                    image_url,
+                )
         }
 
         fn reveal(ref self: ContractState, round_id: u64, bid_id: felt252, salt: felt252) {
@@ -421,6 +485,71 @@ mod FairLaunchAnonymizer {
             let round = self.rounds.entry(round_id).read();
             assert(round.price != 0, errors::ROUND_NOT_FOUND);
             round
+        }
+
+        // Shared by both create_round (public, creator = caller) and
+        // privacy_invoke_create_round (private, creator = zero) — funding is already done
+        // and verified by the caller before this runs; this only allocates the round id and
+        // writes state. Validated here rather than in each caller so both paths reject the
+        // same bad input the same way.
+        fn _create_round(
+            ref self: ContractState,
+            creator: ContractAddress,
+            is_private: bool,
+            launch_token: ContractAddress,
+            price: u128,
+            total_supply: u128,
+            ticket_size: u128,
+            commit_end: u64,
+            reveal_end: u64,
+            name: ByteArray,
+            symbol: ByteArray,
+            description: ByteArray,
+            image_url: ByteArray,
+        ) -> u64 {
+            assert(launch_token.is_non_zero(), errors::ZERO_TOKEN);
+            assert(price != 0, errors::ZERO_PRICE);
+            assert(total_supply != 0, errors::ZERO_SUPPLY);
+            assert(ticket_size != 0, errors::ZERO_TICKET);
+            assert(commit_end < reveal_end, errors::BAD_DEADLINES);
+
+            let round_id = self.next_round_id.read();
+            self.next_round_id.write(round_id + 1);
+            self
+                .rounds
+                .entry(round_id)
+                .write(
+                    Round {
+                        launch_token,
+                        price,
+                        total_supply,
+                        ticket_size,
+                        commit_end,
+                        reveal_end,
+                        revealed_count: 0,
+                        finalized: false,
+                        clearing_num: 0,
+                        clearing_den: 0,
+                    },
+                );
+            self
+                .round_metadata
+                .entry(round_id)
+                .write(RoundMetadata { creator, is_private, name, symbol, description, image_url });
+            self
+                .emit(
+                    RoundCreated {
+                        round_id,
+                        creator,
+                        launch_token,
+                        price,
+                        total_supply,
+                        ticket_size,
+                        commit_end,
+                        reveal_end,
+                    },
+                );
+            round_id
         }
 
         fn _commit(

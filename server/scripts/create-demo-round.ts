@@ -14,7 +14,7 @@ function encodeByteArray(s: string): string[] {
 
 const ALCHEMY_KEY = process.env.ALCHEMY_KEY!;
 const RPC_URL = `https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/${ALCHEMY_KEY}`;
-const FAIR_LAUNCH = "0x0328a81887f0eaa960b95579c9caf1ef596cf40c331f95117ed365b8ed42d6a2";
+const FAIR_LAUNCH = "0x033364f081e7dea882063392be7078696a6d50d3d80f8945355c006e366e267e";
 const STRK_TOKEN = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 
 async function main() {
@@ -43,6 +43,15 @@ async function main() {
     ),
     ...encodeByteArray("https://veyl-tau.vercel.app/tokens/strk.png"),
   ];
+
+  // New contract address - the service account's prior approval doesn't carry over.
+  const approveTx = await account.execute({
+    contractAddress: STRK_TOKEN,
+    entrypoint: "approve",
+    calldata: [FAIR_LAUNCH, num.toHex(1000000000000000000n), "0x0"],
+  });
+  console.log("approve tx:", approveTx.transaction_hash);
+  await provider.waitForTransaction(approveTx.transaction_hash, { retries: 200, retryInterval: 3000 });
 
   const { transaction_hash } = await account.execute({
     contractAddress: FAIR_LAUNCH,

@@ -1,3 +1,4 @@
+use core::num::traits::Zero;
 use core::poseidon::poseidon_hash_span;
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
@@ -345,6 +346,115 @@ fn test_create_round_is_permissionless_and_atomically_funded() {
 
     let meta = anonymizer.get_round_metadata(round_id);
     assert(meta.creator == random_creator, 'wrong creator recorded');
+    assert(meta.is_private == false, 'should not be private');
     assert(meta.name == "My Token", 'wrong name recorded');
     assert(meta.symbol == "MTK", 'wrong symbol recorded');
+}
+
+#[test]
+fn test_privacy_invoke_create_round_hides_creator() {
+    // The private path: the pool calls in (never the creator's own wallet), the launch
+    // token arrives pre-funded via a pool-mediated withdraw (mirrors escrow_ticket's
+    // withdraw-before-invoke pattern, generalized to an arbitrary token), and no creator
+    // address is ever recorded.
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    // Mint straight to the pool and relay it in as the pool, exactly like escrow_ticket
+    // does for STRK — this is what "the pool already withdrew it from the creator's
+    // shielded balance" looks like on-chain: the anonymizer only ever sees POOL() as
+    // sender, never any identity behind it.
+    launch.mint(POOL(), 500);
+    start_cheat_caller_address(launch.contract_address, POOL());
+    launch.transfer(anonymizer.contract_address, 500);
+    stop_cheat_caller_address(launch.contract_address);
+
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    let deposits = anonymizer
+        .privacy_invoke_create_round(
+            launch_token: launch.contract_address,
+            price: 2,
+            total_supply: 500,
+            ticket_size: 1000,
+            commit_end: 100,
+            reveal_end: 200,
+            name: "Private Token",
+            symbol: "PRIV",
+            description: "Created without ever revealing who",
+            image_url: "",
+        );
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    assert(deposits.len() == 0, 'create_round pays out nothing');
+    assert(launch.balance_of(anonymizer.contract_address) == 500, 'not funded');
+
+    let round_id = 0; // first round created in this fresh anonymizer instance
+    let meta = anonymizer.get_round_metadata(round_id);
+    assert(meta.creator.is_zero(), 'creator must stay hidden');
+    assert(meta.is_private == true, 'should be flagged private');
+    assert(meta.name == "Private Token", 'wrong name recorded');
+}
+
+#[test]
+#[should_panic(expected: 'BAD_POOL')]
+fn test_privacy_invoke_create_round_rejects_non_pool_caller() {
+    // Anyone could call this with fabricated launch_token balance sitting in the contract
+    // (e.g. a direct transfer, not a real pool withdraw) if it weren't gated — the whole
+    // point of the private path is that only the pool can vouch that funding actually came
+    // from a shielded withdraw, so a non-pool caller must be rejected outright.
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    let attacker: ContractAddress = 'attacker'.try_into().unwrap();
+    launch.mint(attacker, 500);
+    start_cheat_caller_address(launch.contract_address, attacker);
+    launch.transfer(anonymizer.contract_address, 500);
+    stop_cheat_caller_address(launch.contract_address);
+
+    start_cheat_caller_address(anonymizer.contract_address, attacker);
+    anonymizer
+        .privacy_invoke_create_round(
+            launch_token: launch.contract_address,
+            price: 2,
+            total_supply: 500,
+            ticket_size: 1000,
+            commit_end: 100,
+            reveal_end: 200,
+            name: "x",
+            symbol: "x",
+            description: "",
+            image_url: "",
+        );
+}
+
+#[test]
+#[should_panic(expected: 'FUNDING_FAILED')]
+fn test_privacy_invoke_create_round_rejects_underfunded_call() {
+    // The pool calling in with less launch_token actually delivered than total_supply
+    // claims must fail loudly, not silently create an under-backed round.
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    launch.mint(POOL(), 100); // only 100, but total_supply below claims 500
+    start_cheat_caller_address(launch.contract_address, POOL());
+    launch.transfer(anonymizer.contract_address, 100);
+    stop_cheat_caller_address(launch.contract_address);
+
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer
+        .privacy_invoke_create_round(
+            launch_token: launch.contract_address,
+            price: 2,
+            total_supply: 500,
+            ticket_size: 1000,
+            commit_end: 100,
+            reveal_end: 200,
+            name: "x",
+            symbol: "x",
+            description: "",
+            image_url: "",
+        );
 }
