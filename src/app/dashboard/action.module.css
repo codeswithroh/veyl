@@ -58,6 +58,22 @@
 .stepText { font-size: 12.5px; color: var(--muted); line-height: 1.5; padding-top: 2px; }
 .stepText b { color: var(--text); font-weight: 600; }
 
+/* Uniswap-style tab switcher: one card, three directions */
+.tabRow { display: flex; gap: 6px; padding: 3px; background: var(--surface-2); border-radius: 12px; }
+.tabBtn {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  font-family: var(--font-body), sans-serif;
+}
+.tabBtnActive { background: var(--surface); color: var(--text); }
+
 /* Flow diagram: From -> To, each side tinted by direction */
 .flow {
   display: flex;

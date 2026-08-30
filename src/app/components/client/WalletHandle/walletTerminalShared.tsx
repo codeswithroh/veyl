@@ -192,7 +192,7 @@ export function randomFelt(): string {
   return felt(hex);
 }
 
-function explorerTxUrl(providerIndex: number, h: string) {
+export function explorerTxUrl(providerIndex: number, h: string) {
   return providerIndex === 0 ? `https://voyager.online/tx/${h}` : `https://sepolia.voyager.online/tx/${h}`;
 }
 

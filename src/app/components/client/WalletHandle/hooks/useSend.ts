@@ -36,5 +36,5 @@ export function useSend() {
     }
   };
 
-  return { result, sending, run, amount, setAmount, token: "STRK" };
+  return { result, sending, run, dismiss: () => setResult(null), amount, setAmount, token: "STRK" };
 }

@@ -28,5 +28,5 @@ export function useShield() {
     }
   };
 
-  return { result, shielding, run, amount, setAmount, token: "STRK" };
+  return { result, shielding, run, dismiss: () => setResult(null), amount, setAmount, token: "STRK" };
 }

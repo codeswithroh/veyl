@@ -36,5 +36,5 @@ export function useUnshield() {
     }
   };
 
-  return { result, unshielding, run, amount, setAmount, token: "STRK" };
+  return { result, unshielding, run, dismiss: () => setResult(null), amount, setAmount, token: "STRK" };
 }

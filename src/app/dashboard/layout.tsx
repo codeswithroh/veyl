@@ -12,9 +12,7 @@ import * as constants from "@/utils/constants";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Trade", icon: "⇄" },
   { href: "/dashboard/launch", label: "Launch", icon: "◎" },
-  { href: "/dashboard/shield", label: "Shield", icon: "⛊" },
-  { href: "/dashboard/send", label: "Send", icon: "↗" },
-  { href: "/dashboard/unshield", label: "Unshield", icon: "↙" },
+  { href: "/dashboard/transfer", label: "Transfer", icon: "⛊" },
   { href: "/dashboard/echo", label: "Echo", icon: "⟲" },
   { href: "/dashboard/balances", label: "Balances", icon: "≡" },
 ] as const;
@@ -22,9 +20,7 @@ const NAV_ITEMS = [
 const TITLES: Record<string, string> = {
   "/dashboard": "Trade",
   "/dashboard/launch": "Launch",
-  "/dashboard/shield": "Shield",
-  "/dashboard/send": "Send",
-  "/dashboard/unshield": "Unshield",
+  "/dashboard/transfer": "Transfer",
   "/dashboard/echo": "Echo",
   "/dashboard/balances": "Balances",
 };
