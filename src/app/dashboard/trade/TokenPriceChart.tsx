@@ -22,6 +22,17 @@ function toSeriesData(points: DataPoint[], multiplier: number) {
   return points.map((p) => ({ time: Math.floor(new Date(p.date).getTime() / 1000) as UTCTimestamp, value: p.value * multiplier }));
 }
 
+// lightweight-charts defaults every series to 2-decimal price formatting - fine for a $1+
+// token, but it silently rounds anything under a cent to "0.00" on the axis and the price
+// tag (exactly the bug reported: a $0.0026 token showing "0.00"). Pick real precision from
+// the series' own magnitude instead of trusting the library default.
+function precisionFor(maxAbs: number): number {
+  if (maxAbs >= 1) return 2;
+  if (maxAbs >= 0.01) return 4;
+  if (maxAbs >= 0.0001) return 6;
+  return 8;
+}
+
 function computeSma(data: { time: UTCTimestamp; value: number }[], period: number) {
   const out: { time: UTCTimestamp; value: number }[] = [];
   for (let i = period - 1; i < data.length; i++) {
@@ -125,10 +136,13 @@ export default function TokenPriceChart({
     const multiplier = mode === "mcap" && marketCapMultiplier ? marketCapMultiplier : 1;
     const data = toSeriesData(points, multiplier);
     const color = up ? "#6FBF7A" : "#FF5A2E";
+    const maxAbs = data.reduce((m, d) => Math.max(m, Math.abs(d.value)), 0);
+    const precision = precisionFor(maxAbs);
     seriesRef.current.applyOptions({
       lineColor: color,
       topColor: up ? "rgba(111,191,122,0.28)" : "rgba(255,90,46,0.28)",
       bottomColor: up ? "rgba(111,191,122,0.02)" : "rgba(255,90,46,0.02)",
+      priceFormat: { type: "price", precision, minMove: Math.pow(10, -precision) },
     });
     seriesRef.current.setData(data);
 
