@@ -1,19 +1,5 @@
 /* tastemaker-stamp: screen=app-shell | mood=premium-fintech(ember/vortex) | palette=locked(.tastemaker/style-lock.md) | contrast=text-safe | motion=app-shell track (staggered card entrance on data-load, panel/route transitions — no scroll timeline, there's nothing to scroll-tell in a shell) */
 
-@keyframes dashCardIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .statCard, .card {
-    animation: dashCardIn 0.28s ease-out both;
-  }
-  .statRow .statCard:nth-child(1) { animation-delay: 0ms; }
-  .statRow .statCard:nth-child(2) { animation-delay: 40ms; }
-  .statRow .statCard:nth-child(3) { animation-delay: 80ms; }
-  .statRow .statCard:nth-child(4) { animation-delay: 120ms; }
-}
-
 .shell {
   position: relative;
   min-height: 100dvh;
@@ -159,7 +145,7 @@
 }
 
 .main {
-  max-width: 1320px;
+  max-width: 1760px;
   width: 100%;
   margin: 0 auto;
   padding: 24px 32px 64px;
@@ -167,109 +153,3 @@
   flex-direction: column;
   gap: 18px;
 }
-
-/* ---- Stat row (Overview) ---- */
-.statRow {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-.statCard {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-.statLabel { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.statValue { font-size: 1rem; font-weight: 700; color: var(--text); }
-.statSub { font-size: 11px; color: var(--muted); }
-
-/* ---- Workspace: content column + sticky terminal rail ---- */
-.workspace {
-  display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 16px;
-  align-items: start;
-}
-.workspaceMain {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-.workspaceRail {
-  position: sticky;
-  top: 88px;
-}
-@media (max-width: 980px) {
-  .workspace { grid-template-columns: 1fr; }
-  .workspaceRail { position: static; }
-}
-@media (max-width: 860px) {
-  .statRow { grid-template-columns: repeat(2, 1fr); }
-}
-
-/* ---- Cards (chart / table) ---- */
-.card {
-  border-radius: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 18px 20px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.cardHead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.cardHead h2 { font-size: 0.95rem; font-weight: 700; margin: 0; }
-.cardHint { font-size: 11px; color: var(--muted); }
-
-/* chart */
-.chartTop { display: flex; align-items: baseline; gap: 10px; }
-.chartPrice { font-size: 1.4rem; font-weight: 800; }
-.chartUp { color: var(--green); font-size: 0.85rem; font-weight: 700; }
-.chartDown { color: var(--primary); font-size: 0.85rem; font-weight: 700; }
-.chartBox { height: 140px; margin-top: 4px; }
-
-/* table */
-.tableWrap { overflow-x: auto; }
-.table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.table th {
-  text-align: left;
-  font-weight: 600;
-  color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0 10px 8px;
-  border-bottom: 1px solid var(--border);
-}
-.table td {
-  padding: 10px 10px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  white-space: nowrap;
-}
-.table tr:last-child td { border-bottom: none; }
-.roundCell { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.tableEmpty { font-size: 13px; color: var(--muted); padding: 12px 2px; }
-
-.statusPill {
-  display: inline-flex;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-}
-.status-live { background: rgba(111, 191, 122, 0.16); color: var(--green); }
-.status-pending { background: rgba(255, 90, 46, 0.16); color: var(--primary); }
-.status-done { background: var(--surface-2); color: var(--muted); }
-
-.rowAction {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--primary);
-}
-.rowAction:hover { color: var(--text); }

@@ -36,7 +36,10 @@ function fmtPct(n: number | null | undefined): string {
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
 
-export default function TradePage() {
+// The default dashboard landing screen — a trading terminal modeled on real
+// reference layouts the user provided (fomo-style: dominant chart in the center,
+// a scrollable token list on the left, a buy/sell ticket on the right).
+export default function TradeTerminal() {
   const t = useTrade();
   const market = useTokenMarket(t.buyTokenAddress || null);
   const [timeframe, setTimeframe] = useState<Timeframe>("1D");
@@ -69,14 +72,6 @@ export default function TradePage() {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.pageHead}>
-        <span className={styles.iconBadge}>⇄</span>
-        <div className={styles.pageHeadText}>
-          <h2>Trade</h2>
-          <p>Private swap via AVNU — amounts stay hidden inside the pool. Market data is live from AVNU.</p>
-        </div>
-      </div>
-
       {!t.canTrade && (
         <p className={uni.warn}>
           Market data below is always live from Starknet Mainnet. Your wallet is on Sepolia, so browsing works but executing a trade needs Mainnet — switch networks in your wallet when you&apos;re ready to trade.
@@ -117,7 +112,8 @@ export default function TradePage() {
           )}
         </div>
 
-        {/* Center: selected token market data + real intraday chart */}
+        {/* Center: the chart is the focus — identity + stat pills, timeframe/OHLC toolbar,
+            then a large chart, matching the reference's chart-dominant layout. */}
         <div className={styles.card}>
           {!t.buyToken ? (
             <div className={styles.emptyState}>Select a token to see its market data.</div>
@@ -125,52 +121,37 @@ export default function TradePage() {
             <>
               <div className={styles.marketHead}>
                 <TokenLogo src={t.buyToken.logoUri} symbol={t.buyToken.symbol} size={36} className={styles.marketLogo} fallbackClassName={styles.marketLogoFallback} />
-                <div>
-                  <div className={styles.marketTitle}>
-                    <h3>{t.buyToken.name}</h3>
-                    <span className={styles.marketSymbol}>{t.buyToken.symbol}</span>
+                <div className={styles.marketTitle}>
+                  <h3>{t.buyToken.name}</h3>
+                  <span className={styles.marketSymbol}>{t.buyToken.symbol}</span>
+                </div>
+
+                <div className={styles.headerPills}>
+                  <div className={styles.headerPill}>
+                    <span className={styles.headerPillLabel}>Market cap</span>
+                    <span className={styles.headerPillValue}>{fmtUsd(market.data?.global?.usdMarketCap)}</span>
                   </div>
-                  <div className={styles.marketPriceRow}>
-                    <span className={styles.marketPrice}>
+                  <div className={styles.headerPill}>
+                    <span className={styles.headerPillLabel}>Price</span>
+                    <span className={styles.headerPillValue}>
                       {fmtPrice(market.data?.starknet?.usd ?? t.pricesUsd[t.buyToken.address])}
                     </span>
-                    {change24h !== null && (
-                      <span className={up ? styles.marketChangeUp : styles.marketChangeDown}>
-                        {up ? "▲" : "▼"} {fmtPct(change24h)} (24h)
-                      </span>
-                    )}
                   </div>
-                </div>
-              </div>
-
-              <div className={styles.statRow}>
-                <div className={styles.statBox}>
-                  <span className={styles.statLabel}>Market cap</span>
-                  <span className={styles.statValue}>{fmtUsd(market.data?.global?.usdMarketCap)}</span>
-                </div>
-                <div className={styles.statBox}>
-                  <span className={styles.statLabel}>24h volume</span>
-                  <span className={styles.statValue}>{fmtUsd(market.data?.starknet?.usdVolume24h)}</span>
-                </div>
-                <div className={styles.statBox}>
-                  <span className={styles.statLabel}>TVL</span>
-                  <span className={styles.statValue}>{fmtUsd(market.data?.starknet?.usdTvl)}</span>
-                </div>
-              </div>
-
-              <div className={styles.changeChips}>
-                {[
-                  { label: "1H", v: market.data?.starknet?.usdPriceChangePercentage1h },
-                  { label: "24H", v: market.data?.starknet?.usdPriceChangePercentage24h },
-                  { label: "7D", v: market.data?.starknet?.usdPriceChangePercentage7d },
-                ].map((c) => (
-                  <div key={c.label} className={styles.changeChip}>
-                    <span className={styles.changeChipLabel}>{c.label}</span>
-                    <span className={`${styles.changeChipValue} ${(c.v ?? 0) >= 0 ? styles.statValueUp : styles.statValueDown}`}>
-                      {fmtPct(c.v)}
+                  <div className={styles.headerPill}>
+                    <span className={styles.headerPillLabel}>24H change</span>
+                    <span className={`${styles.headerPillValue} ${up ? styles.statValueUp : styles.statValueDown}`}>
+                      {change24h !== null ? `${up ? "▲" : "▼"} ${fmtPct(change24h)}` : "—"}
                     </span>
                   </div>
-                ))}
+                  <div className={styles.headerPill}>
+                    <span className={styles.headerPillLabel}>24H vol.</span>
+                    <span className={styles.headerPillValue}>{fmtUsd(market.data?.starknet?.usdVolume24h)}</span>
+                  </div>
+                  <div className={styles.headerPill}>
+                    <span className={styles.headerPillLabel}>TVL</span>
+                    <span className={styles.headerPillValue}>{fmtUsd(market.data?.starknet?.usdTvl)}</span>
+                  </div>
+                </div>
               </div>
 
               <div className={styles.timeframeRow}>
@@ -202,6 +183,21 @@ export default function TradePage() {
               ) : (
                 <TokenPriceChart points={feed.points} up={sessionUp} timeframe={timeframe} />
               )}
+
+              <div className={styles.changeChips}>
+                {[
+                  { label: "1H", v: market.data?.starknet?.usdPriceChangePercentage1h },
+                  { label: "24H", v: market.data?.starknet?.usdPriceChangePercentage24h },
+                  { label: "7D", v: market.data?.starknet?.usdPriceChangePercentage7d },
+                ].map((c) => (
+                  <div key={c.label} className={styles.changeChip}>
+                    <span className={styles.changeChipLabel}>{c.label}</span>
+                    <span className={`${styles.changeChipValue} ${(c.v ?? 0) >= 0 ? styles.statValueUp : styles.statValueDown}`}>
+                      {fmtPct(c.v)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </div>

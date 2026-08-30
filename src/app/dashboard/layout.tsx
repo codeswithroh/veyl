@@ -9,8 +9,7 @@ import { useStoreWallet } from "../components/Wallet/walletContext";
 import * as constants from "@/utils/constants";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Overview", icon: "◧" },
-  { href: "/dashboard/trade", label: "Trade", icon: "⇄" },
+  { href: "/dashboard", label: "Trade", icon: "⇄" },
   { href: "/dashboard/launch", label: "Launch", icon: "◎" },
   { href: "/dashboard/shield", label: "Shield", icon: "⛊" },
   { href: "/dashboard/send", label: "Send", icon: "↗" },
@@ -20,8 +19,7 @@ const NAV_ITEMS = [
 ] as const;
 
 const TITLES: Record<string, string> = {
-  "/dashboard": "Overview",
-  "/dashboard/trade": "Trade",
+  "/dashboard": "Trade",
   "/dashboard/launch": "Launch",
   "/dashboard/shield": "Shield",
   "/dashboard/send": "Send",

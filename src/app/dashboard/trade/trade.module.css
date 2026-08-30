@@ -5,27 +5,12 @@
   flex-direction: column;
   gap: 16px;
 }
-.pageHead { display: flex; align-items: center; gap: 12px; }
-.pageHeadText h2 { margin: 0; font-size: 1.05rem; font-weight: 700; }
-.pageHeadText p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
-.iconBadge {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  background: rgba(255, 90, 46, 0.08);
-  border: 1px solid rgba(255, 90, 46, 0.3);
-  color: var(--primary);
-  flex: none;
-}
 
-/* ---- Three-column terminal ---- */
+/* ---- Three-column terminal: the chart column is the dominant element, per the
+   reference layout - narrower fixed rails on either side, everything else to center. ---- */
 .terminal {
   display: grid;
-  grid-template-columns: 260px 1fr 340px;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
   gap: 16px;
   align-items: start;
 }
@@ -50,7 +35,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 560px;
+  max-height: 720px;
   overflow-y: auto;
 }
 .tokenRow {
@@ -82,26 +67,32 @@
 .tokenPrice { font-size: 12px; font-weight: 700; color: var(--text); flex: none; }
 .tokenListEmpty { font-size: 12.5px; color: var(--muted); padding: 12px 4px; }
 
-/* ---- Market header + stats (center) ---- */
-.marketHead { display: flex; align-items: center; gap: 12px; }
+/* ---- Market header (center): identity + a single horizontal stat-pill row, matching
+   the reference's info bar instead of a stacked price block + separate grid. ---- */
+.marketHead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .marketLogo { width: 36px; height: 36px; border-radius: 50%; background: var(--surface-2); object-fit: cover; }
 .marketLogoFallback {
   width: 36px; height: 36px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 800; color: var(--muted); background: var(--surface-2);
 }
-.marketTitle { display: flex; align-items: baseline; gap: 8px; }
+.marketTitle { display: flex; align-items: baseline; gap: 8px; flex: none; }
 .marketTitle h3 { margin: 0; font-size: 1.05rem; font-weight: 800; }
 .marketSymbol { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
-.marketPriceRow { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; }
-.marketPrice { font-size: 1.3rem; font-weight: 800; }
-.marketChangeUp { color: var(--green); font-weight: 700; font-size: 13px; }
-.marketChangeDown { color: var(--primary); font-weight: 700; font-size: 13px; }
 
-.statRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.statBox { padding: 12px 14px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 4px; }
-.statLabel { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.statValue { font-size: 0.95rem; font-weight: 700; }
+.headerPills { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.headerPill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  min-width: 84px;
+}
+.headerPillLabel { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.headerPillValue { font-size: 13px; font-weight: 700; }
+
 .statValueUp { color: var(--green); }
 .statValueDown { color: var(--primary); }
 
@@ -139,7 +130,10 @@
 .ohlcRow { display: flex; gap: 14px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
 .ohlcRow b { color: var(--text); font-weight: 700; }
 
-.chartBox { height: 220px; position: relative; }
+.chartBox { height: 460px; position: relative; }
+@media (max-width: 1100px) {
+  .chartBox { height: 320px; }
+}
 .chartEmpty { font-size: 12.5px; color: var(--muted); padding: 40px 0; text-align: center; }
 
 /* ---- Buy/sell ticket (right) ---- */
