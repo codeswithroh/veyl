@@ -92,7 +92,13 @@ export default function TokenPriceChart({
       const entry = entries[0];
       if (!entry) return;
       const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) chart.resize(width, height);
+      if (width > 0 && height > 0) {
+        chart.resize(width, height);
+        // resize() alone repositions the canvas but keeps the old bar spacing, so data
+        // fit for a stale (narrow) width stays visually compressed on one side of the
+        // now-wider chart - re-fit the visible range every time the size actually changes.
+        chart.timeScale().fitContent();
+      }
     });
     resizeObserver.observe(container);
 

@@ -8,6 +8,7 @@ import { ResultCard } from "../../components/client/WalletHandle/walletTerminalS
 import { useTrade } from "../../components/client/WalletHandle/hooks/useTrade";
 import { useTokenMarket } from "../../components/client/WalletHandle/hooks/useTokenMarket";
 import { useTokenPriceFeed, TIMEFRAMES, type Timeframe } from "../../components/client/WalletHandle/hooks/useTokenPriceFeed";
+import { useTokenSocials } from "../../components/client/WalletHandle/hooks/useTokenSocials";
 import { useBalances } from "../../components/client/WalletHandle/hooks/useBalances";
 import { useStoreWallet } from "../../components/Wallet/walletContext";
 import { useFrontendProvider } from "../../components/client/provider/providerContext";
@@ -44,7 +45,9 @@ export default function TradeTerminal() {
   const market = useTokenMarket(t.buyTokenAddress || null);
   const [timeframe, setTimeframe] = useState<Timeframe>("1D");
   const feed = useTokenPriceFeed(t.buyTokenAddress || null, timeframe);
+  const socials = useTokenSocials(t.buyToken?.extensions?.coingeckoId);
   const balances = useBalances();
+  const [search, setSearch] = useState("");
   const isConnected = useStoreWallet((s) => s.isConnected);
   const providerIndex = useFrontendProvider((s) => s.currentFrontendProviderIndex);
 
@@ -77,6 +80,12 @@ export default function TradeTerminal() {
 
   const strkBalanceRow = balances.result?.rows?.find((r) => r.label === "STRK");
 
+  const filteredTokens = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return t.tokens;
+    return t.tokens.filter((tok) => tok.symbol.toLowerCase().includes(q) || tok.name.toLowerCase().includes(q));
+  }, [t.tokens, search]);
+
   return (
     <div className={styles.wrap}>
       {!t.canTrade && (
@@ -92,13 +101,22 @@ export default function TradeTerminal() {
           <div className={styles.listHead}>
             <h3>Tokens</h3>
           </div>
+          <input
+            className={styles.tokenSearch}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search tokens…"
+            aria-label="Search tokens"
+          />
           {t.tokensLoading ? (
             <div className={styles.tokenListEmpty}>Loading tokens…</div>
           ) : t.tokens.length === 0 ? (
             <div className={styles.tokenListEmpty}>No tokens available.</div>
+          ) : filteredTokens.length === 0 ? (
+            <div className={styles.tokenListEmpty}>No tokens match &quot;{search}&quot;.</div>
           ) : (
             <div className={styles.tokenList}>
-              {t.tokens.map((tok) => {
+              {filteredTokens.map((tok) => {
                 const price = t.pricesUsd[tok.address];
                 return (
                   <button
@@ -131,6 +149,19 @@ export default function TradeTerminal() {
                 <div className={styles.marketTitle}>
                   <h3>{t.buyToken.name}</h3>
                   <span className={styles.marketSymbol}>{t.buyToken.symbol}</span>
+                  {(socials.data?.homepage || socials.data?.twitter || socials.data?.telegram) && (
+                    <span className={styles.socialLinks}>
+                      {socials.data?.homepage && (
+                        <a href={socials.data.homepage} target="_blank" rel="noreferrer" title="Website">🌐</a>
+                      )}
+                      {socials.data?.twitter && (
+                        <a href={`https://x.com/${socials.data.twitter}`} target="_blank" rel="noreferrer" title="X / Twitter">𝕏</a>
+                      )}
+                      {socials.data?.telegram && (
+                        <a href={`https://t.me/${socials.data.telegram}`} target="_blank" rel="noreferrer" title="Telegram">✈</a>
+                      )}
+                    </span>
+                  )}
                 </div>
 
                 <div className={styles.headerPills}>
@@ -205,6 +236,13 @@ export default function TradeTerminal() {
                   </div>
                 ))}
               </div>
+
+              {socials.data?.description && (
+                <div className={styles.aboutBox}>
+                  <span className={styles.aboutTitle}>About {t.buyToken.symbol}</span>
+                  <p className={styles.aboutText}>{socials.data.description}</p>
+                </div>
+              )}
             </>
           )}
         </div>
