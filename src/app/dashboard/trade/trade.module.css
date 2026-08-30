@@ -98,14 +98,48 @@
 .marketChangeUp { color: var(--green); font-weight: 700; font-size: 13px; }
 .marketChangeDown { color: var(--primary); font-weight: 700; font-size: 13px; }
 
-.statRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.statRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .statBox { padding: 12px 14px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 4px; }
 .statLabel { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .statValue { font-size: 0.95rem; font-weight: 700; }
 .statValueUp { color: var(--green); }
 .statValueDown { color: var(--primary); }
 
-.chartBox { height: 260px; position: relative; }
+/* Real 1H/24H/7D change chips, the honest subset of fomo's 5M/1H/4H/1D row (we only
+   have these three windows from AVNU's market data). */
+.changeChips { display: flex; gap: 8px; }
+.changeChip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.changeChipLabel { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.changeChipValue { font-size: 12.5px; font-weight: 700; }
+
+/* Timeframe tabs + real session O/H/L/last readout, computed from the actual fetched
+   intraday feed for the selected window (not fabricated candle data). */
+.timeframeRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.timeframeTabs { display: flex; gap: 4px; }
+.timeframeTab {
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font-body), sans-serif;
+}
+.timeframeTabActive { background: var(--surface-2); color: var(--text); }
+.ohlcRow { display: flex; gap: 14px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+.ohlcRow b { color: var(--text); font-weight: 700; }
+
+.chartBox { height: 220px; position: relative; }
 .chartEmpty { font-size: 12.5px; color: var(--muted); padding: 40px 0; text-align: center; }
 
 /* ---- Buy/sell ticket (right) ---- */
@@ -176,19 +210,26 @@
 .quoteBox { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
 .quoteRow { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); }
 .quoteRow b { color: var(--text); font-weight: 700; }
+.availableLine { font-size: 11.5px; color: var(--muted); padding: 0 2px; }
 
 /* ---- Positions ---- */
 .positionsList { display: flex; flex-direction: column; gap: 8px; }
 .positionRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--surface-2);
   font-size: 12.5px;
   font-weight: 600;
 }
+.positionIcon {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 800; color: var(--muted); background: var(--surface);
+}
+.positionLabel { flex: 1; }
 .positionsEmpty { font-size: 12px; color: var(--muted); }
 
 .emptyState { font-size: 12.5px; color: var(--muted); padding: 24px 0; text-align: center; }

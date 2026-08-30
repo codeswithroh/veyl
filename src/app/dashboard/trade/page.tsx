@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./trade.module.css";
 import uni from "../../uni.module.css";
 import SelectWallet from "../../components/client/WalletHandle/SelectWallet";
 import { ResultCard } from "../../components/client/WalletHandle/walletTerminalShared";
 import { useTrade } from "../../components/client/WalletHandle/hooks/useTrade";
 import { useTokenMarket } from "../../components/client/WalletHandle/hooks/useTokenMarket";
+import { useTokenPriceFeed, TIMEFRAMES, type Timeframe } from "../../components/client/WalletHandle/hooks/useTokenPriceFeed";
 import { useBalances } from "../../components/client/WalletHandle/hooks/useBalances";
 import { useStoreWallet } from "../../components/Wallet/walletContext";
 import { useFrontendProvider } from "../../components/client/provider/providerContext";
 import { StrkCoin } from "../../components/TokenIcons";
 import TokenPriceChart from "./TokenPriceChart";
+import TokenLogo from "./TokenLogo";
 
 const QUICK_AMOUNTS = ["1", "5", "10", "50"];
 
@@ -24,6 +26,11 @@ function fmtUsd(n: number | null | undefined): string {
   return `$${n.toPrecision(3)}`;
 }
 
+function fmtPrice(n: number | null | undefined): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  return n >= 1 ? `$${n.toFixed(4)}` : `$${n.toPrecision(4)}`;
+}
+
 function fmtPct(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
@@ -32,6 +39,8 @@ function fmtPct(n: number | null | undefined): string {
 export default function TradePage() {
   const t = useTrade();
   const market = useTokenMarket(t.buyTokenAddress || null);
+  const [timeframe, setTimeframe] = useState<Timeframe>("1D");
+  const feed = useTokenPriceFeed(t.buyTokenAddress || null, timeframe);
   const balances = useBalances();
   const isConnected = useStoreWallet((s) => s.isConnected);
   const providerIndex = useFrontendProvider((s) => s.currentFrontendProviderIndex);
@@ -43,6 +52,20 @@ export default function TradePage() {
 
   const change24h = market.data?.starknet?.usdPriceChangePercentage24h ?? null;
   const up = (change24h ?? 0) >= 0;
+
+  const session = useMemo(() => {
+    if (!feed.points.length) return null;
+    const values = feed.points.map((p) => p.value);
+    return {
+      open: values[0],
+      high: Math.max(...values),
+      low: Math.min(...values),
+      last: values[values.length - 1],
+    };
+  }, [feed.points]);
+  const sessionUp = session ? session.last >= session.open : up;
+
+  const strkBalanceRow = balances.result?.rows?.find((r) => r.label === "STRK");
 
   return (
     <div className={styles.wrap}>
@@ -81,17 +104,12 @@ export default function TradePage() {
                     className={`${styles.tokenRow} ${tok.address === t.buyTokenAddress ? styles.tokenRowActive : ""}`}
                     onClick={() => t.setBuyTokenAddress(tok.address)}
                   >
-                    {tok.logoUri ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img className={styles.tokenLogo} src={tok.logoUri} alt="" />
-                    ) : (
-                      <span className={styles.tokenLogoFallback}>{tok.symbol.slice(0, 2).toUpperCase()}</span>
-                    )}
+                    <TokenLogo src={tok.logoUri} symbol={tok.symbol} size={26} className={styles.tokenLogo} fallbackClassName={styles.tokenLogoFallback} />
                     <span className={styles.tokenRowText}>
                       <span className={styles.tokenSymbol}>{tok.symbol}</span>
                       <span className={styles.tokenName}>{tok.name}</span>
                     </span>
-                    <span className={styles.tokenPrice}>{price !== undefined ? fmtUsd(price) : "—"}</span>
+                    <span className={styles.tokenPrice}>{price !== undefined ? fmtPrice(price) : "—"}</span>
                   </button>
                 );
               })}
@@ -99,19 +117,14 @@ export default function TradePage() {
           )}
         </div>
 
-        {/* Center: selected token market data + real price chart */}
+        {/* Center: selected token market data + real intraday chart */}
         <div className={styles.card}>
           {!t.buyToken ? (
             <div className={styles.emptyState}>Select a token to see its market data.</div>
           ) : (
             <>
               <div className={styles.marketHead}>
-                {t.buyToken.logoUri ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className={styles.marketLogo} src={t.buyToken.logoUri} alt="" />
-                ) : (
-                  <span className={styles.marketLogoFallback}>{t.buyToken.symbol.slice(0, 2).toUpperCase()}</span>
-                )}
+                <TokenLogo src={t.buyToken.logoUri} symbol={t.buyToken.symbol} size={36} className={styles.marketLogo} fallbackClassName={styles.marketLogoFallback} />
                 <div>
                   <div className={styles.marketTitle}>
                     <h3>{t.buyToken.name}</h3>
@@ -119,7 +132,7 @@ export default function TradePage() {
                   </div>
                   <div className={styles.marketPriceRow}>
                     <span className={styles.marketPrice}>
-                      {fmtUsd(market.data?.starknet?.usd ?? t.pricesUsd[t.buyToken.address])}
+                      {fmtPrice(market.data?.starknet?.usd ?? t.pricesUsd[t.buyToken.address])}
                     </span>
                     {change24h !== null && (
                       <span className={up ? styles.marketChangeUp : styles.marketChangeDown}>
@@ -143,20 +156,51 @@ export default function TradePage() {
                   <span className={styles.statLabel}>TVL</span>
                   <span className={styles.statValue}>{fmtUsd(market.data?.starknet?.usdTvl)}</span>
                 </div>
-                <div className={styles.statBox}>
-                  <span className={styles.statLabel}>7d change</span>
-                  <span className={(market.data?.starknet?.usdPriceChangePercentage7d ?? 0) >= 0 ? `${styles.statValue} ${styles.statValueUp}` : `${styles.statValue} ${styles.statValueDown}`}>
-                    {fmtPct(market.data?.starknet?.usdPriceChangePercentage7d)}
-                  </span>
-                </div>
               </div>
 
-              {market.loading ? (
-                <div className={styles.chartEmpty}>Loading market data…</div>
-              ) : market.error ? (
-                <div className={styles.chartEmpty}>Couldn&apos;t load market data: {market.error}</div>
+              <div className={styles.changeChips}>
+                {[
+                  { label: "1H", v: market.data?.starknet?.usdPriceChangePercentage1h },
+                  { label: "24H", v: market.data?.starknet?.usdPriceChangePercentage24h },
+                  { label: "7D", v: market.data?.starknet?.usdPriceChangePercentage7d },
+                ].map((c) => (
+                  <div key={c.label} className={styles.changeChip}>
+                    <span className={styles.changeChipLabel}>{c.label}</span>
+                    <span className={`${styles.changeChipValue} ${(c.v ?? 0) >= 0 ? styles.statValueUp : styles.statValueDown}`}>
+                      {fmtPct(c.v)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className={styles.timeframeRow}>
+                <div className={styles.timeframeTabs}>
+                  {TIMEFRAMES.map((tf) => (
+                    <button
+                      key={tf}
+                      className={`${styles.timeframeTab} ${tf === timeframe ? styles.timeframeTabActive : ""}`}
+                      onClick={() => setTimeframe(tf)}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
+                {session && (
+                  <div className={styles.ohlcRow}>
+                    <span>O <b>{fmtPrice(session.open)}</b></span>
+                    <span>H <b>{fmtPrice(session.high)}</b></span>
+                    <span>L <b>{fmtPrice(session.low)}</b></span>
+                    <span>Last <b>{fmtPrice(session.last)}</b></span>
+                  </div>
+                )}
+              </div>
+
+              {feed.loading ? (
+                <div className={styles.chartEmpty}>Loading price feed…</div>
+              ) : feed.error ? (
+                <div className={styles.chartEmpty}>Couldn&apos;t load price feed: {feed.error}</div>
               ) : (
-                <TokenPriceChart points={market.data?.linePriceFeedInUsd ?? []} up={up} />
+                <TokenPriceChart points={feed.points} up={sessionUp} timeframe={timeframe} />
               )}
             </>
           )}
@@ -199,6 +243,11 @@ export default function TradePage() {
               )}
             </span>
           </div>
+          {t.side === "buy" && isConnected && (
+            <span className={styles.availableLine}>
+              {strkBalanceRow ? `${strkBalanceRow.value} STRK shielded` : "No STRK shielded yet — see Balances"}
+            </span>
+          )}
 
           <div className={styles.quickRow}>
             {QUICK_AMOUNTS.map((a) => (
@@ -260,7 +309,12 @@ export default function TradePage() {
             <div className={styles.positionsList}>
               {balances.result.rows.map((row) => (
                 <div key={row.label} className={styles.positionRow}>
-                  <span>{row.label}</span>
+                  {row.label === "STRK" ? (
+                    <StrkCoin size={22} />
+                  ) : (
+                    <span className={styles.positionIcon}>{row.label.slice(0, 2).toUpperCase()}</span>
+                  )}
+                  <span className={styles.positionLabel}>{row.label}</span>
                   <span>{row.value}</span>
                 </div>
               ))}
