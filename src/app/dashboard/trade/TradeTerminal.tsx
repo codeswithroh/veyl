@@ -68,6 +68,13 @@ export default function TradeTerminal() {
   }, [feed.points]);
   const sessionUp = session ? session.last >= session.open : up;
 
+  // Implied supply from real market cap ÷ real price - used to derive a market-cap series
+  // from the price feed for the chart's Price/MCap toggle (mcap(t) = price(t) × supply).
+  const marketCapMultiplier =
+    market.data?.global?.usdMarketCap && market.data?.starknet?.usd
+      ? market.data.global.usdMarketCap / market.data.starknet.usd
+      : null;
+
   const strkBalanceRow = balances.result?.rows?.find((r) => r.label === "STRK");
 
   return (
@@ -181,7 +188,7 @@ export default function TradeTerminal() {
               ) : feed.error ? (
                 <div className={styles.chartEmpty}>Couldn&apos;t load price feed: {feed.error}</div>
               ) : (
-                <TokenPriceChart points={feed.points} up={sessionUp} />
+                <TokenPriceChart points={feed.points} up={sessionUp} marketCapMultiplier={marketCapMultiplier} />
               )}
 
               <div className={styles.changeChips}>

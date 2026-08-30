@@ -136,6 +136,38 @@
 }
 .chartEmpty { font-size: 12.5px; color: var(--muted); padding: 40px 0; text-align: center; }
 
+/* Chart toolbar: Price/MCap, SMA, download, fullscreen (top) and %/log/auto scale
+   controls (bottom) - all real lightweight-charts / browser features, wired to real data. */
+.chartWrap { display: flex; flex-direction: column; gap: 8px; }
+.chartWrap:fullscreen,
+.chartWrap:-webkit-full-screen {
+  background: var(--bg);
+  padding: 20px;
+  justify-content: center;
+}
+.chartWrap:fullscreen .chartBox,
+.chartWrap:-webkit-full-screen .chartBox {
+  height: calc(100vh - 120px);
+}
+.chartToolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chartToolbarGroup { display: flex; gap: 4px; }
+.chartToolBtn {
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font-body), sans-serif;
+}
+.chartToolBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) {
+  .chartToolBtn:not(:disabled):hover { color: var(--text); }
+}
+.chartToolBtnActive { background: var(--surface-2); color: var(--text); }
+
 /* ---- Buy/sell ticket (right) ---- */
 .sideTabs { display: flex; gap: 6px; padding: 3px; background: var(--surface-2); border-radius: 10px; }
 .sideTab {
