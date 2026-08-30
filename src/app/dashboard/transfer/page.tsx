@@ -21,6 +21,24 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "unshield", label: "Unshield", icon: "↙" },
 ];
 
+const INFO: Record<Tab, string[]> = {
+  shield: [
+    "Deposit moves STRK from your public account into the shielded pool in one signature.",
+    "The pool issues you a private note — its amount and owner aren't visible on-chain.",
+    "From here, switch to Send to transfer privately, or Unshield to withdraw back to a public balance.",
+  ],
+  send: [
+    "A transfer moves value between notes entirely inside the shielded pool — no public transaction reveals the amount.",
+    "This demo sends back to your own connected address — a real recipient picker is a straightforward next step.",
+    "Need funds in the pool first? Switch to Shield.",
+  ],
+  unshield: [
+    "A withdraw spends a note from the pool and pays out the public STRK ERC20 to a chosen address.",
+    "This demo always withdraws to your own connected account.",
+    "The withdrawn amount and recipient become public on-chain — only the link to how it entered the pool stays hidden.",
+  ],
+};
+
 function stepFor(busy: boolean, result: ActionResult | null): TxStep | null {
   if (result?.status === "ok") return "done";
   if (result?.status === "error") return "error";
@@ -30,9 +48,9 @@ function stepFor(busy: boolean, result: ActionResult | null): TxStep | null {
 }
 
 // Shield, Send, and Unshield are three directions of the same underlying action (move
-// funds across the shielded/public line, or privately within it) — one Uniswap-style card
-// with a tab switcher instead of three separate pages, with a step-by-step progress modal
-// standing in for the old inline pending/result card.
+// funds across the shielded/public line, or privately within it) — one Uniswap-style card,
+// centered, with a tab switcher instead of three separate pages. Rules live behind a hover
+// "i" instead of a permanent side panel, matching Uniswap's own info-icon pattern.
 export default function TransferPage() {
   const [tab, setTab] = useState<Tab>("shield");
   const shield = useShield();
@@ -52,26 +70,33 @@ export default function TransferPage() {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.pageHead}>
-        <span className={`${styles.iconBadge} ${styles.iconBadgeAccent}`}>{TABS.find((t) => t.key === tab)?.icon}</span>
-        <div className={styles.pageHeadText}>
-          <h2>Transfer</h2>
-          <p>Move STRK between your public balance and the shielded pool, or privately within it.</p>
-        </div>
-      </div>
-
-      <div className={styles.layout}>
+      <div className={styles.centerWrap}>
         <div className={styles.card}>
-          <div className={styles.tabRow}>
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                className={`${styles.tabBtn} ${tab === t.key ? styles.tabBtnActive : ""}`}
-                onClick={() => setTab(t.key)}
-              >
-                {t.label}
+          <div className={styles.cardHeadRow}>
+            <div className={styles.tabRow}>
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  className={`${styles.tabBtn} ${tab === t.key ? styles.tabBtnActive : ""}`}
+                  onClick={() => setTab(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <span className={styles.infoWrap} tabIndex={0}>
+              <button type="button" className={styles.infoTrigger} aria-label={`How ${tab} works`}>
+                i
               </button>
-            ))}
+              <div className={styles.infoTooltip} role="tooltip">
+                <span className={styles.infoTooltipTitle}>How {tab} works</span>
+                <ol className={styles.infoTooltipList}>
+                  {INFO[tab].map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ol>
+              </div>
+            </span>
           </div>
 
           {tab === "shield" && (
@@ -141,60 +166,6 @@ export default function TransferPage() {
           ) : (
             <SelectWallet variant="ctaBig" />
           )}
-        </div>
-
-        <div className={styles.infoCard}>
-          <p className={styles.infoTitle}>How it works</p>
-          <ol className={styles.stepList}>
-            {tab === "shield" && (
-              <>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>1</span>
-                  <span className={styles.stepText}><b>Deposit</b> moves STRK from your public account into the shielded pool in one signature.</span>
-                </li>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>2</span>
-                  <span className={styles.stepText}>The pool issues you a private note — its amount and owner aren't visible on-chain.</span>
-                </li>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>3</span>
-                  <span className={styles.stepText}>From here, switch to <b>Send</b> to transfer privately, or <b>Unshield</b> to withdraw back to a public balance.</span>
-                </li>
-              </>
-            )}
-            {tab === "send" && (
-              <>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>1</span>
-                  <span className={styles.stepText}>A <b>transfer</b> moves value between notes entirely inside the shielded pool — no public transaction reveals the amount.</span>
-                </li>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>2</span>
-                  <span className={styles.stepText}>This demo sends back to your own connected address — a real recipient picker is a straightforward next step.</span>
-                </li>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>3</span>
-                  <span className={styles.stepText}>Need funds in the pool first? Switch to <b>Shield</b>.</span>
-                </li>
-              </>
-            )}
-            {tab === "unshield" && (
-              <>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>1</span>
-                  <span className={styles.stepText}>A <b>withdraw</b> spends a note from the pool and pays out the public STRK ERC20 to a chosen address.</span>
-                </li>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>2</span>
-                  <span className={styles.stepText}>This demo always withdraws to your own connected account.</span>
-                </li>
-                <li className={styles.step}>
-                  <span className={styles.stepNum}>3</span>
-                  <span className={styles.stepText}>The withdrawn amount and recipient become public on-chain — only the link to how it entered the pool stays hidden.</span>
-                </li>
-              </>
-            )}
-          </ol>
         </div>
       </div>
 

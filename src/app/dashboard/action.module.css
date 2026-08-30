@@ -6,17 +6,16 @@
   gap: 16px;
 }
 
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 560px) 1fr;
-  gap: 16px;
-  align-items: start;
-}
-@media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
+/* Uniswap-style: one card, centered on the page, no permanent side panel. */
+.centerWrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 24px;
 }
 
 .card {
+  width: 100%;
+  max-width: 440px;
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -26,37 +25,8 @@
   gap: 20px;
 }
 
-/* Side info panel: fills the rest of the row instead of leaving a lone form card
-   floating in empty space — steps + a live shielded-balance readout. */
-.infoCard {
-  border-radius: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  height: 100%;
-}
-.infoTitle { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0; }
-.stepList { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; }
-.step { display: flex; gap: 12px; }
-.stepNum {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--primary);
-}
-.stepText { font-size: 12.5px; color: var(--muted); line-height: 1.5; padding-top: 2px; }
-.stepText b { color: var(--text); font-weight: 600; }
+.cardHeadRow { display: flex; align-items: center; gap: 10px; }
+.cardHeadRow .tabRow { flex: 1; }
 
 /* Uniswap-style tab switcher: one card, three directions */
 .tabRow { display: flex; gap: 6px; padding: 3px; background: var(--surface-2); border-radius: 12px; }
@@ -73,6 +43,56 @@
   font-family: var(--font-body), sans-serif;
 }
 .tabBtnActive { background: var(--surface); color: var(--text); }
+
+/* Info "i": rules live behind a hover instead of a permanent panel. Wrapper (not the
+   button) gets :focus-within so keyboard users tabbing to the button also reveal it. */
+.infoWrap { position: relative; display: inline-flex; flex: none; }
+.infoTrigger {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  font-style: italic;
+  font-family: var(--font-body), sans-serif;
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.infoTooltip {
+  position: absolute;
+  top: 32px;
+  right: 0;
+  width: 260px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 20;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .infoTooltip { transition: opacity 120ms ease, transform 120ms ease; }
+}
+.infoWrap:hover .infoTooltip,
+.infoWrap:focus-within .infoTooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.infoTooltipTitle { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; color: var(--muted); text-transform: capitalize; }
+.infoTooltipList { margin: 0; padding: 0 0 0 16px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text); line-height: 1.5; }
 
 /* Flow diagram: From -> To, each side tinted by direction */
 .flow {
