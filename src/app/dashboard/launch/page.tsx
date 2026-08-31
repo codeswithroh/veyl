@@ -24,7 +24,7 @@ export default function LaunchBrowsePage() {
       <div className={styles.head}>
         <div className={styles.headText}>
           <h2>Launches</h2>
-          <p>Sealed-bid fair launches — fixed ticket size, pro-rata clearing, sealed until reveal.</p>
+          <p>Sealed-bid fair launches: fixed ticket size, pro-rata clearing, sealed until reveal.</p>
         </div>
         <Link href="/dashboard/launch/create" className={uni.btnCta} style={{ width: "auto", padding: "12px 20px" }}>
           + Create launch
@@ -34,7 +34,7 @@ export default function LaunchBrowsePage() {
       {error && <div className={styles.empty}>{error}</div>}
       {!error && items === null && <div className={styles.empty}>Loading launches…</div>}
       {!error && items !== null && items.length === 0 && (
-        <div className={styles.empty}>No launches yet on this network. Be the first — create one.</div>
+        <div className={styles.empty}>No launches yet on this network. Be the first to create one.</div>
       )}
       {!error && items !== null && items.length > 0 && (
         <div className={styles.grid} style={{ marginTop: 16 }}>

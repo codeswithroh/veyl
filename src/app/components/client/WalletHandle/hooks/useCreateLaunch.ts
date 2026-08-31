@@ -267,7 +267,7 @@ export function useCreateLaunch() {
       setStep("done");
       setResult({
         status: "ok",
-        title: roundId !== null ? `Launch created — round #${roundId.toString()}` : "Launch created",
+        title: roundId !== null ? `Launch created, round #${roundId.toString()}` : "Launch created",
         rows: [{ label: "Transaction", value: shortHex(createTx.transaction_hash), hash: createTx.transaction_hash }],
       });
     } catch (error: any) {

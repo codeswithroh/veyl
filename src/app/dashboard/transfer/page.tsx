@@ -24,18 +24,18 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 const INFO: Record<Tab, string[]> = {
   shield: [
     "Deposit moves STRK from your public account into the shielded pool in one signature.",
-    "The pool issues you a private note — its amount and owner aren't visible on-chain.",
+    "The pool issues you a private note. Its amount and owner aren't visible on-chain.",
     "From here, switch to Send to transfer privately, or Unshield to withdraw back to a public balance.",
   ],
   send: [
-    "A transfer moves value between notes entirely inside the shielded pool — no public transaction reveals the amount.",
-    "This demo sends back to your own connected address — a real recipient picker is a straightforward next step.",
+    "A transfer moves value between notes entirely inside the shielded pool. No public transaction reveals the amount.",
+    "This demo sends back to your own connected address. A real recipient picker is a straightforward next step.",
     "Need funds in the pool first? Switch to Shield.",
   ],
   unshield: [
     "A withdraw spends a note from the pool and pays out the public STRK ERC20 to a chosen address.",
     "This demo always withdraws to your own connected account.",
-    "The withdrawn amount and recipient become public on-chain — only the link to how it entered the pool stays hidden.",
+    "The withdrawn amount and recipient become public on-chain. Only the link to how it entered the pool stays hidden.",
   ],
 };
 
@@ -155,7 +155,7 @@ export default function TransferPage() {
           </div>
           <p className={styles.hint}>
             {tab === "shield" && "Deposits into the privacy pool from your connected wallet."}
-            {tab === "send" && "Private self-transfer inside the pool — a new note is issued for the amount above."}
+            {tab === "send" && "Private self-transfer inside the pool. A new note is issued for the amount above."}
             {tab === "unshield" && "Withdraws to your connected public account."}
           </p>
 

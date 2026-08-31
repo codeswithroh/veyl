@@ -53,7 +53,7 @@ export default function LaunchDetailPage({ params }: { params: Promise<{ id: str
           </div>
           {r.metadata?.description && <p className={styles.detailDesc}>{r.metadata.description}</p>}
           {r.metadata?.is_private ? (
-            <div className={styles.detailCreator}>🔒 Created privately — no creator address recorded</div>
+            <div className={styles.detailCreator}>🔒 Created privately, no creator address recorded</div>
           ) : (
             r.metadata?.creator && num.toBigInt(r.metadata.creator) !== 0n && (
               <div className={styles.detailCreator}>Created by {shortHex(r.metadata.creator)}</div>
@@ -92,7 +92,7 @@ export default function LaunchDetailPage({ params }: { params: Promise<{ id: str
                   ? r.round.clearing_num === r.round.clearing_den
                     ? "Full fill"
                     : `${((Number(r.round.clearing_num) / Number(r.round.clearing_den)) * 100).toFixed(1)}%`
-                  : "—"}
+                  : "-"}
               </span>
             </div>
             <div className={styles.statBox}>
@@ -103,7 +103,7 @@ export default function LaunchDetailPage({ params }: { params: Promise<{ id: str
                   : r.round.finalized
                   ? r.claimLocked
                     ? `Claim opens ${new Date(Number(r.round.claim_unlock_time) * 1000).toLocaleString()}`
-                    : "Elapsed — claim open"
+                    : "Elapsed, claim open"
                   : `${(Number(r.round.claim_delay) / 60).toFixed(0)} min after finalize`}
               </span>
             </div>

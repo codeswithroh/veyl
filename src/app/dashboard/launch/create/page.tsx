@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../launch.module.css";
 import uni from "../../../uni.module.css";
@@ -10,48 +10,6 @@ import { useCreateLaunch, useLaunchFee } from "../../../components/client/Wallet
 import { useStoreWallet } from "../../../components/Wallet/walletContext";
 import { useFrontendProvider } from "../../../components/client/provider/providerContext";
 import * as constants from "@/utils/constants";
-
-const OFFICIAL_DOMAIN = "veyl-tau.vercel.app";
-
-// Hostname isn't known during SSR, so this renders nothing until mounted rather than
-// guessing — computing it eagerly caused a server/client markup mismatch (React
-// hydration error) since the server always sees no hostname at all.
-function VerifyBanner({ fairLaunchAddr }: { fairLaunchAddr: string }) {
-  const [hostname, setHostname] = useState<string | null>(null);
-  useEffect(() => setHostname(window.location.hostname), []);
-  if (hostname === null) return null;
-
-  const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
-  const isOfficial = isLocal || hostname === OFFICIAL_DOMAIN;
-
-  if (isOfficial) {
-    return (
-      <div className={styles.verifyBanner}>
-        <span className={styles.verifyBannerIcon}>✓</span>
-        <div className={styles.verifyBannerBody}>
-          <span className={styles.verifyBannerTitle}>
-            {isLocal ? "Local dev build" : `Verified — you're on the official ${OFFICIAL_DOMAIN}`}
-          </span>
-          <span>Cross-check this contract address against any link you were sent before approving a transaction.</span>
-          <span className={styles.verifyBannerAddr}>{fairLaunchAddr}</span>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className={`${styles.verifyBanner} ${styles.verifyBannerWarn}`}>
-      <span className={styles.verifyBannerIcon}>⚠</span>
-      <div className={styles.verifyBannerBody}>
-        <span className={styles.verifyBannerTitle}>You're not on {OFFICIAL_DOMAIN}</span>
-        <span>
-          This page is running on <strong>{hostname || "an unknown domain"}</strong>. Phishing clones copy this
-          UI exactly — confirm the contract address below before approving anything.
-        </span>
-        <span className={styles.verifyBannerAddr}>{fairLaunchAddr}</span>
-      </div>
-    </div>
-  );
-}
 
 function ImageUpload({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -102,7 +60,7 @@ function ImageUpload({ imageUrl, onChange }: { imageUrl: string; onChange: (url:
         />
         <span className={styles.uploadBoxIcon}>🖼</span>
         <span className={styles.uploadBoxText}>{uploading ? "Uploading…" : "Select an image to upload"}</span>
-        <span className={styles.uploadBoxHint}>PNG, JPG, GIF, or WEBP — max 15MB, 1:1 square recommended</span>
+        <span className={styles.uploadBoxHint}>PNG, JPG, GIF, or WEBP, max 15MB, 1:1 square recommended</span>
       </label>
       {error && <span className={styles.uploadBoxError}>{error}</span>}
     </div>
@@ -157,7 +115,6 @@ export default function CreateLaunchPage() {
   const { feeDisplay } = useLaunchFee();
   const isConnected = useStoreWallet((s) => s.isConnected);
   const providerIndex = useFrontendProvider((s) => s.currentFrontendProviderIndex);
-  const fairLaunchAddr = constants.fairLaunchAnonymizerForIndex(providerIndex);
   const networkLabel = constants.Strk20Networks[providerIndex] === "MAINNET" ? "Mainnet" : "Sepolia";
 
   const [visibility, setVisibility] = useState<"public" | "private">("public");
@@ -215,11 +172,9 @@ export default function CreateLaunchPage() {
         <div className={styles.head}>
           <div className={styles.headText}>
             <h2>Create launch</h2>
-            <p>Permissionless — anyone can open a round.</p>
+            <p>Permissionless, anyone can open a round.</p>
           </div>
         </div>
-
-        <VerifyBanner fairLaunchAddr={fairLaunchAddr} />
 
         <div className={styles.formCard}>
           <span className={styles.formSectionTitle}>Visibility</span>
@@ -245,7 +200,7 @@ export default function CreateLaunchPage() {
             </span>
           ) : (
             <span className={styles.formHint}>
-              No creator address is ever recorded. Requires the launch token to already be shielded in your privacy pool balance (Shield it first if you haven't) — it's withdrawn straight into the round in one signature, with the privacy pool itself as the on-chain caller instead of your wallet.
+              No creator address is ever recorded. Requires the launch token to already be shielded in your privacy pool balance (Shield it first if you haven't). It's withdrawn straight into the round in one signature, with the privacy pool itself as the on-chain caller instead of your wallet.
             </span>
           )}
         </div>
@@ -312,7 +267,7 @@ export default function CreateLaunchPage() {
                 <input id="ticketSize" className={styles.formInput} value={ticketSize} onChange={(e) => setTicketSize(e.target.value)} inputMode="decimal" required />
                 <span className={styles.inputSuffix}>STRK</span>
               </div>
-              <span className={styles.formHint}>Every bidder escrows exactly this much — identical commits hide participation, not amount.</span>
+              <span className={styles.formHint}>Every bidder escrows exactly this much: identical commits hide participation, not amount.</span>
             </div>
             <div />
           </div>
@@ -341,7 +296,7 @@ export default function CreateLaunchPage() {
               <span className={styles.toggleRowTitle}>Anti-sniping claim delay</span>
               <span className={styles.toggleRowDesc}>
                 Sealed-bid commit/reveal already prevents front-running during the bid itself. This adds a
-                uniform delay after the round finalizes before anyone — including bots — can claim, so no
+                uniform delay after the round finalizes before anyone, including bots, can claim, so no
                 one can race to claim and dump before other winners even see it land.
               </span>
               {antiSnipe && (

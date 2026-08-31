@@ -52,10 +52,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
   }
   if (!ALLOWED_TYPES.has(file.type)) {
-    return NextResponse.json({ error: "Unsupported file type — use PNG, JPG, GIF, or WEBP." }, { status: 400 });
+    return NextResponse.json({ error: "Unsupported file type. Use PNG, JPG, GIF, or WEBP." }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "File too large — max 15MB." }, { status: 400 });
+    return NextResponse.json({ error: "File too large. Max 15MB." }, { status: 400 });
   }
 
   const ext = EXT_FOR_TYPE[file.type];

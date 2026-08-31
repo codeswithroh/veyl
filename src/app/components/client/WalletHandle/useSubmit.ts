@@ -35,7 +35,7 @@ export function useSubmit() {
         errorResult(
           walletApiList.length
             ? `This wallet reports Wallet API ${walletApiList.join(", ")}, but STRK20 private actions need >= 0.10.3. Update your wallet extension.`
-            : `This wallet didn't report a Wallet API version, so STRK20 private actions can't be confirmed as supported. Update your wallet extension, or a raw error like INVALID_REQUEST_PAYLOAD from here likely means this — not a bug in what we're sending.`
+            : `This wallet didn't report a Wallet API version, so STRK20 private actions can't be confirmed as supported. Update your wallet extension. A raw error like INVALID_REQUEST_PAYLOAD from here likely means this, not a bug in what we're sending.`
         )
       );
       return undefined;
@@ -87,7 +87,7 @@ export function useSubmit() {
         note:
           `${error?.message ?? error?.toString?.() ?? String(error)}\n\n` +
           `If your wallet shows this succeeded, it likely confirmed on a different network ` +
-          `than this page is tracking — check the transaction hash above on the right ` +
+          `than this page is tracking. Check the transaction hash above on the right ` +
           `network's explorer directly.`,
       });
     }

@@ -20,7 +20,7 @@ const QUICK_AMOUNTS = ["1", "5", "10", "50"];
 const TOKEN_LIST_COLLAPSE_KEY = "veyl-token-list-collapsed";
 
 function fmtUsd(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  if (n === null || n === undefined || Number.isNaN(n)) return "-";
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
@@ -29,12 +29,12 @@ function fmtUsd(n: number | null | undefined): string {
 }
 
 function fmtPrice(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  if (n === null || n === undefined || Number.isNaN(n)) return "-";
   return n >= 1 ? `$${n.toFixed(4)}` : `$${n.toPrecision(4)}`;
 }
 
 function fmtPct(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  if (n === null || n === undefined || Number.isNaN(n)) return "-";
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
 
@@ -115,7 +115,7 @@ export default function TradeTerminal() {
     <div className={styles.wrap}>
       {!t.canTrade && (
         <p className={uni.warn}>
-          Market data below is always live from Starknet Mainnet. Your wallet is on Sepolia, so browsing works but executing a trade needs Mainnet — switch networks in your wallet when you&apos;re ready to trade.
+          Market data below is always live from Starknet Mainnet. Your wallet is on Sepolia, so browsing works but executing a trade needs Mainnet. Switch networks in your wallet when you&apos;re ready to trade.
         </p>
       )}
       {t.tokensError && <p className={uni.warn}>Couldn&apos;t load tokens: {t.tokensError}</p>}
@@ -135,7 +135,7 @@ export default function TradeTerminal() {
                     key={tok.address}
                     className={`${styles.tokenRailItem} ${tok.address === t.buyTokenAddress ? styles.tokenRowActive : ""}`}
                     onClick={() => t.setBuyTokenAddress(tok.address)}
-                    title={`${tok.symbol} — ${tok.name}`}
+                    title={`${tok.symbol} (${tok.name})`}
                   >
                     <TokenLogo src={tok.logoUri} symbol={tok.symbol} size={26} className={styles.tokenLogo} fallbackClassName={styles.tokenLogoFallback} />
                   </button>
@@ -178,7 +178,7 @@ export default function TradeTerminal() {
                           <span className={styles.tokenSymbol}>{tok.symbol}</span>
                           <span className={styles.tokenName}>{tok.name}</span>
                         </span>
-                        <span className={styles.tokenPrice}>{price !== undefined ? fmtPrice(price) : "—"}</span>
+                        <span className={styles.tokenPrice}>{price !== undefined ? fmtPrice(price) : "-"}</span>
                       </button>
                     );
                   })}
@@ -229,7 +229,7 @@ export default function TradeTerminal() {
                   <div className={styles.headerPill}>
                     <span className={styles.headerPillLabel}>24H change</span>
                     <span className={`${styles.headerPillValue} ${up ? styles.statValueUp : styles.statValueDown}`}>
-                      {change24h !== null ? `${up ? "▲" : "▼"} ${fmtPct(change24h)}` : "—"}
+                      {change24h !== null ? `${up ? "▲" : "▼"} ${fmtPct(change24h)}` : "-"}
                     </span>
                   </div>
                   <div className={styles.headerPill}>
@@ -331,13 +331,13 @@ export default function TradeTerminal() {
                   STRK
                 </>
               ) : (
-                t.buyToken?.symbol ?? "—"
+                t.buyToken?.symbol ?? "-"
               )}
             </span>
           </div>
           {t.side === "buy" && isConnected && (
             <span className={styles.availableLine}>
-              {strkBalanceRow ? `${strkBalanceRow.value} STRK shielded` : "No STRK shielded yet — see Balances"}
+              {strkBalanceRow ? `${strkBalanceRow.value} STRK shielded` : "No STRK shielded yet, see Balances"}
             </span>
           )}
 

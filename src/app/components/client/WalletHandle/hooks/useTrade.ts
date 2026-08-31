@@ -121,7 +121,7 @@ export function useTrade() {
       return;
     }
     if (!canTrade) {
-      setQuoteError("Switch your wallet to Starknet Mainnet to trade — AVNU can't route swaps on Sepolia.");
+      setQuoteError("Switch your wallet to Starknet Mainnet to trade. AVNU can't route swaps on Sepolia.");
       return;
     }
     if (!buyToken) {
