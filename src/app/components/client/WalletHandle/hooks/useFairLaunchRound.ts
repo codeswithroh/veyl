@@ -20,6 +20,8 @@ export type FairLaunchRound = {
   finalized: boolean;
   clearing_num: bigint;
   clearing_den: bigint;
+  claim_delay: bigint;
+  claim_unlock_time: bigint;
 };
 
 export type RoundMetadata = {
@@ -52,6 +54,8 @@ function toRound(r: any): FairLaunchRound {
     finalized: Boolean(r.finalized),
     clearing_num: BigInt(r.clearing_num),
     clearing_den: BigInt(r.clearing_den),
+    claim_delay: BigInt(r.claim_delay ?? 0),
+    claim_unlock_time: BigInt(r.claim_unlock_time ?? 0),
   };
 }
 
@@ -161,10 +165,16 @@ export function useFairLaunchRound(roundId: bigint) {
   const commitOpen = round ? nowSec <= round.commit_end : false;
   const revealOpen = round ? nowSec <= round.reveal_end : false;
   const canFinalize = round ? !round.finalized && nowSec > round.reveal_end : false;
+  // Anti-sniping: claim_unlock_time is only meaningful once finalize() has run (it's 0
+  // before then) — checked separately from `finalized` itself so the UI can tell "not
+  // finalized yet" apart from "finalized, but still inside the claim delay".
+  const claimLocked = round ? round.finalized && nowSec < round.claim_unlock_time : false;
   const roundPhase = !round
     ? "loading"
     : round.finalized
-    ? "finalized"
+    ? claimLocked
+      ? "claim locked"
+      : "finalized"
     : canFinalize
     ? "ready to finalize"
     : revealOpen && !commitOpen
@@ -263,6 +273,11 @@ export function useFairLaunchRound(roundId: bigint) {
       setResultClaim(errorResult("Round isn't finalized yet."));
       return;
     }
+    if (nowSec < round.claim_unlock_time) {
+      const mins = Math.ceil(Number(round.claim_unlock_time - nowSec) / 60);
+      setResultClaim(errorResult(`Anti-sniping delay: claiming opens in ~${mins} minute${mins === 1 ? "" : "s"}.`));
+      return;
+    }
     setClaiming(true);
     try {
       const strkAlloc = (round.ticket_size * round.clearing_num) / round.clearing_den;
@@ -308,6 +323,7 @@ export function useFairLaunchRound(roundId: bigint) {
     commitOpen,
     revealOpen,
     canFinalize,
+    claimLocked,
     roundPhase,
     committing,
     revealing,

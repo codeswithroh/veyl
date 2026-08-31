@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@avnu/avnu-sdk": "4.2.0",
+    "@aws-sdk/client-s3": "3.1121.0",
     "@starknet-io/get-starknet-discovery": "6.0.2",
     "@starknet-io/get-starknet-wallet-standard": "6.0.2",
+    "ethers": "^6.15.0",
     "gsap": "^3.15.0",
     "lightweight-charts": "5.2.1",
     "next": "^16.0.8",

@@ -48,14 +48,13 @@ export const Strk20Networks: Record<number, string> = { 0: "MAINNET", 2: "SEPOLI
 // UNAUDITED, Sepolia-only for now. See cairo/README.md and STRK20_INTEGRATION_PLAN.md
 // §7 before pointing a real launch at this.
 
-// Redeployed 2026-08-31: adds privacy_invoke_create_round, the private counterpart to
-// create_round — called by the pool (not the creator's wallet), so no creator address is
-// ever recorded (RoundMetadata gained is_private). See cairo/address.md and cairo/README.md
-// "Mainnet deployment" for why this exists. Builds on the 2026-08-26 permissionless
-// create_round, unchanged here. "0x0" = not deployed on this network (mainnet: no
-// deployment yet, needs its own explicit go after a real audit — see
-// STRK20_INTEGRATION_PLAN.md §7).
-export const FairLaunchAnonymizerSepolia = "0x033364f081e7dea882063392be7078696a6d50d3d80f8945355c006e366e267e";
+// Redeployed 2026-08-31: adds a flat, admin-settable launch_fee (0 by default, forwarded
+// to fee_recipient immediately at creation — see get_launch_fee/set_launch_fee) and an
+// anti-sniping claim_delay_seconds param on both create paths (every bidder gets the same
+// post-finalize window before claim() will pay out). See cairo/address.md for the full
+// history. "0x0" = not deployed on this network (mainnet: no deployment yet, needs its own
+// explicit go after a real audit — see STRK20_INTEGRATION_PLAN.md §7).
+export const FairLaunchAnonymizerSepolia = "0x0028c12d3fb690a3ccce37cdfa1e27a7c703c118f1ecd9840893a0a691cda80a";
 export const FairLaunchAnonymizerMainnet = "0x0";
 
 // Resolve the fair-launch anonymizer for a frontend provider index (0 = Mainnet, 2 = Sepolia).
@@ -84,6 +83,8 @@ export const FairLaunchAnonymizerAbi = [
             { name: "finalized", type: "core::bool" },
             { name: "clearing_num", type: "core::integer::u128" },
             { name: "clearing_den", type: "core::integer::u128" },
+            { name: "claim_delay", type: "core::integer::u64" },
+            { name: "claim_unlock_time", type: "core::integer::u64" },
         ],
     },
     {
@@ -162,12 +163,33 @@ export const FairLaunchAnonymizerAbi = [
             { name: "ticket_size", type: "core::integer::u128" },
             { name: "commit_end", type: "core::integer::u64" },
             { name: "reveal_end", type: "core::integer::u64" },
+            { name: "claim_delay_seconds", type: "core::integer::u64" },
             { name: "name", type: "core::byte_array::ByteArray" },
             { name: "symbol", type: "core::byte_array::ByteArray" },
             { name: "description", type: "core::byte_array::ByteArray" },
             { name: "image_url", type: "core::byte_array::ByteArray" },
         ],
         outputs: [{ type: "core::integer::u64" }],
+        state_mutability: "external",
+    },
+    // Flat STRK fee charged at creation — 0 until the admin sets one via set_launch_fee.
+    {
+        type: "function",
+        name: "get_launch_fee",
+        inputs: [],
+        outputs: [
+            { type: "(core::integer::u128, core::starknet::contract_address::ContractAddress)" },
+        ],
+        state_mutability: "view",
+    },
+    {
+        type: "function",
+        name: "set_launch_fee",
+        inputs: [
+            { name: "fee", type: "core::integer::u128" },
+            { name: "recipient", type: "core::starknet::contract_address::ContractAddress" },
+        ],
+        outputs: [],
         state_mutability: "external",
     },
 ] as const;

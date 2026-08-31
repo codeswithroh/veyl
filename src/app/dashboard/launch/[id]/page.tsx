@@ -95,6 +95,18 @@ export default function LaunchDetailPage({ params }: { params: Promise<{ id: str
                   : "—"}
               </span>
             </div>
+            <div className={styles.statBox}>
+              <span className={styles.statBoxLabel}>Anti-sniping delay</span>
+              <span className={styles.statBoxValue}>
+                {r.round.claim_delay === 0n
+                  ? "None"
+                  : r.round.finalized
+                  ? r.claimLocked
+                    ? `Claim opens ${new Date(Number(r.round.claim_unlock_time) * 1000).toLocaleString()}`
+                    : "Elapsed — claim open"
+                  : `${(Number(r.round.claim_delay) / 60).toFixed(0)} min after finalize`}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -119,8 +131,12 @@ export default function LaunchDetailPage({ params }: { params: Promise<{ id: str
               <button className={`${uni.btn} ${uni.btnGhost}`} disabled={r.finalizing || !r.canFinalize} onClick={r.finalize}>
                 {r.finalizing ? "Finalizing…" : "Finalize round"}
               </button>
-              <button className={`${uni.btn} ${uni.btnGreen}`} disabled={r.claiming || !r.bidCreds || !r.bidRevealed || !r.round.finalized || !!r.bidClaimed} onClick={r.claim}>
-                {r.claiming ? "Claiming…" : "Claim"}
+              <button
+                className={`${uni.btn} ${uni.btnGreen}`}
+                disabled={r.claiming || !r.bidCreds || !r.bidRevealed || !r.round.finalized || !!r.bidClaimed || r.claimLocked}
+                onClick={r.claim}
+              >
+                {r.claiming ? "Claiming…" : r.claimLocked ? "Locked (anti-sniping)" : "Claim"}
               </button>
             </div>
           ) : (

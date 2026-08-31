@@ -14,7 +14,7 @@ function encodeByteArray(s: string): string[] {
 
 const ALCHEMY_KEY = process.env.ALCHEMY_KEY!;
 const RPC_URL = `https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/${ALCHEMY_KEY}`;
-const FAIR_LAUNCH = "0x033364f081e7dea882063392be7078696a6d50d3d80f8945355c006e366e267e";
+const FAIR_LAUNCH = "0x0028c12d3fb690a3ccce37cdfa1e27a7c703c118f1ecd9840893a0a691cda80a";
 const STRK_TOKEN = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 
 async function main() {
@@ -36,6 +36,7 @@ async function main() {
     num.toHex(100000000000000000n), // ticket_size (0.1 STRK)
     num.toHex(commitEnd),
     num.toHex(revealEnd),
+    num.toHex(0n), // claim_delay_seconds (no anti-sniping delay for the demo round)
     ...encodeByteArray("Veyl Demo Launch"),
     ...encodeByteArray("VEYL"),
     ...encodeByteArray(

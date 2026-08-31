@@ -65,6 +65,8 @@ export function useLaunchList(providerIndex: number) {
             finalized: Boolean(r.finalized),
             clearing_num: BigInt(r.clearing_num),
             clearing_den: BigInt(r.clearing_den),
+            claim_delay: BigInt(r.claim_delay ?? 0),
+            claim_unlock_time: BigInt(r.claim_unlock_time ?? 0),
           },
           metadata,
         });

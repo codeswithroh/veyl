@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { num } from "starknet";
+import { useEffect, useState } from "react";
+import { Contract, num } from "starknet";
 import type { WALLET_API } from "@starknet-io/types-js";
 import * as constants from "@/utils/constants";
 import { useStoreWallet } from "../../../Wallet/walletContext";
 import { useFrontendProvider } from "../../provider/providerContext";
 import { useSubmit } from "../useSubmit";
-import { ActionResult, errorResult, felt, shortHex } from "../walletTerminalShared";
+import { ActionResult, errorResult, felt, fmtStrk, shortHex } from "../walletTerminalShared";
 
 export type CreateLaunchInput = {
   launchToken: string;
@@ -16,11 +16,58 @@ export type CreateLaunchInput = {
   ticketSizeStrk: string; // STRK per ticket, decimal string
   commitDays: number;
   revealDays: number;
+  claimDelayMinutes: number; // anti-sniping: 0 = no delay
   name: string;
   symbol: string;
   description: string;
   imageUrl: string;
 };
+
+// Reads the contract's current flat STRK launch fee — shown to the user before they
+// create a round, and charged for real at creation (see cairo/src/lib.cairo
+// get_launch_fee/set_launch_fee). Admin-settable, zero until explicitly turned on.
+export function useLaunchFee() {
+  const myFrontendProviderIndex = useFrontendProvider((state) => state.currentFrontendProviderIndex);
+  const [fee, setFee] = useState<bigint>(0n);
+  const [feeRecipient, setFeeRecipient] = useState<string>("0x0");
+
+  useEffect(() => {
+    const fairLaunchAddr = constants.fairLaunchAnonymizerForIndex(myFrontendProviderIndex);
+    const provider = constants.myFrontendProviders[myFrontendProviderIndex];
+    let hasAddress = false;
+    try {
+      hasAddress = !!provider && num.toBigInt(fairLaunchAddr) !== 0n;
+    } catch {
+      hasAddress = false;
+    }
+    if (!hasAddress) {
+      setFee(0n);
+      setFeeRecipient("0x0");
+      return;
+    }
+    let cancelled = false;
+    const contract = new Contract({ abi: constants.FairLaunchAnonymizerAbi as unknown as any, address: fairLaunchAddr, providerOrAccount: provider });
+    contract
+      .call("get_launch_fee", [])
+      .then((r: any) => {
+        if (cancelled) return;
+        const [feeVal, recipient] = Array.isArray(r) ? r : [r["0"], r["1"]];
+        setFee(BigInt(feeVal));
+        setFeeRecipient(num.toHex(recipient));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFee(0n);
+          setFeeRecipient("0x0");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [myFrontendProviderIndex]);
+
+  return { fee, feeRecipient, feeDisplay: fmtStrk(fee) };
+}
 
 // Create a new permissionless fair-launch round: approve the anonymizer for total_supply
 // of the creator's own token, then call create_round (which atomically pulls that supply
@@ -30,6 +77,7 @@ export function useCreateLaunch() {
   const myWalletAccount = useStoreWallet((state) => state.myWalletAccount);
   const myFrontendProviderIndex = useFrontendProvider((state) => state.currentFrontendProviderIndex);
   const submit = useSubmit();
+  const { fee: launchFeeUnits } = useLaunchFee();
   const [result, setResult] = useState<ActionResult | null>(null);
   const [step, setStep] = useState<"idle" | "approving" | "creating" | "done">("idle");
   const [createdRoundId, setCreatedRoundId] = useState<bigint | null>(null);
@@ -77,6 +125,7 @@ export function useCreateLaunch() {
     const now = Math.floor(Date.now() / 1000);
     const commitEnd = now + input.commitDays * 86400;
     const revealEnd = commitEnd + input.revealDays * 86400;
+    const claimDelaySeconds = Math.max(0, Math.round(input.claimDelayMinutes * 60));
 
     setStep("creating");
     try {
@@ -87,6 +136,7 @@ export function useCreateLaunch() {
         felt(ticketSizeUnits),
         felt(commitEnd),
         felt(revealEnd),
+        felt(claimDelaySeconds),
         ...(await encodeByteArray(input.name)),
         ...(await encodeByteArray(input.symbol)),
         ...(await encodeByteArray(input.description)),
@@ -94,8 +144,14 @@ export function useCreateLaunch() {
       ];
       const actions: WALLET_API.STRK20_ACTION[] = [
         { type: "withdraw", token: input.launchToken, amount: felt(totalSupplyUnits), recipient: fairLaunchAddr },
-        { type: "invoke", contract: fairLaunchAddr, calldata },
       ];
+      // The pool never sees the creator's wallet, so if a launch fee is set, it must be
+      // pre-funded in STRK the same way total_supply is — the contract verifies both via a
+      // balance-delta check before it will record the round (cairo/src/lib.cairo).
+      if (launchFeeUnits > 0n) {
+        actions.push({ type: "withdraw", token: constants.addrSTRK, amount: felt(launchFeeUnits), recipient: fairLaunchAddr });
+      }
+      actions.push({ type: "invoke", contract: fairLaunchAddr, calldata });
       const txH = await submit(actions, setResult, `${input.totalSupply} ${input.symbol} (private launch)`);
       if (txH) {
         setStep("done");
@@ -144,17 +200,29 @@ export function useCreateLaunch() {
     const now = Math.floor(Date.now() / 1000);
     const commitEnd = now + input.commitDays * 86400;
     const revealEnd = commitEnd + input.revealDays * 86400;
+    const claimDelaySeconds = Math.max(0, Math.round(input.claimDelayMinutes * 60));
 
     try {
       setStep("approving");
       setResult({ status: "pending", title: "Confirm the approval in your wallet…" });
-      const approveTx = await myWalletAccount.execute([
+      // Batched in one signed transaction: approve the launch token for total_supply, and
+      // (if a launch fee is set) approve STRK for the fee too — the contract pulls both via
+      // transfer_from in the same create_round call.
+      const approveCalls = [
         {
           contractAddress: input.launchToken,
           entrypoint: "approve",
           calldata: [fairLaunchAddr, num.toHex(totalSupplyUnits), "0"],
         },
-      ]);
+      ];
+      if (launchFeeUnits > 0n) {
+        approveCalls.push({
+          contractAddress: constants.addrSTRK,
+          entrypoint: "approve",
+          calldata: [fairLaunchAddr, num.toHex(launchFeeUnits), "0"],
+        });
+      }
+      const approveTx = await myWalletAccount.execute(approveCalls);
       await provider.waitForTransaction(approveTx.transaction_hash, { retries: 200, retryInterval: 3000 });
 
       setStep("creating");
@@ -171,6 +239,7 @@ export function useCreateLaunch() {
         num.toHex(ticketSizeUnits),
         num.toHex(commitEnd),
         num.toHex(revealEnd),
+        num.toHex(claimDelaySeconds),
         ...encode(input.name),
         ...encode(input.symbol),
         ...encode(input.description),
@@ -207,5 +276,5 @@ export function useCreateLaunch() {
     }
   };
 
-  return { create, createPrivate, result, step, createdRoundId };
+  return { create, createPrivate, result, step, createdRoundId, launchFeeUnits };
 }

@@ -37,6 +37,16 @@
 //! parameters (`token_note_id`, `strk_note_id`) for that transaction's two pre-created open
 //! notes, entirely separate from `bid_id`.
 //!
+//! Anti-sniping: every `create_round` call also sets `claim_delay_seconds`, a uniform
+//! window after `finalize()` during which nobody — including the fastest bot — can call
+//! `claim`. Since there's no live price during commit/reveal to snipe in the first place,
+//! this closes the other timing exploit: racing to claim (and dump) before other winners
+//! even see the finalize tx land.
+//!
+//! Launch fee: `launch_fee`/`fee_recipient` are admin-settable (`set_launch_fee`), flat
+//! STRK, charged once at creation and forwarded immediately — this contract never holds
+//! fee revenue. Zero by default until an admin sets one.
+//!
 //! UNAUDITED. This is a first draft for testnet iteration, not a production deployment —
 //! see STRK20_INTEGRATION_PLAN.md §7 for the required audit step before any mainnet round.
 
@@ -81,6 +91,15 @@ pub struct Round {
     // clearing_den == 0 before finalize.
     pub clearing_num: u128,
     pub clearing_den: u128,
+    // Anti-sniping: seconds after finalize() before any bidder may claim. Set once at
+    // create_round and never changed — every bidder in the round gets the exact same
+    // window, so nobody can watch the finalize tx land and claim (and dump) a moment
+    // before everyone else. 0 means no delay. See `claim_unlock_time` below.
+    pub claim_delay: u64,
+    // 0 until finalize() runs, then set to finalize's block_timestamp + claim_delay.
+    // `_claim` checks against this, not against claim_delay directly, so the window is
+    // anchored to when the round actually finalized rather than some earlier deadline.
+    pub claim_unlock_time: u64,
 }
 
 // Display metadata, written once at create_round and never rewritten — kept in its own
@@ -103,6 +122,7 @@ pub struct RoundMetadata {
 pub trait IErc20<TState> {
     fn balance_of(self: @TState, account: ContractAddress) -> u256;
     fn approve(ref self: TState, spender: ContractAddress, amount: u256) -> bool;
+    fn transfer(ref self: TState, recipient: ContractAddress, amount: u256) -> bool;
     fn transfer_from(
         ref self: TState, sender: ContractAddress, recipient: ContractAddress, amount: u256,
     ) -> bool;
@@ -136,6 +156,7 @@ pub trait IFairLaunchAnonymizer<TState> {
         ticket_size: u128,
         commit_end: u64,
         reveal_end: u64,
+        claim_delay_seconds: u64,
         name: ByteArray,
         symbol: ByteArray,
         description: ByteArray,
@@ -155,6 +176,7 @@ pub trait IFairLaunchAnonymizer<TState> {
         ticket_size: u128,
         commit_end: u64,
         reveal_end: u64,
+        claim_delay_seconds: u64,
         name: ByteArray,
         symbol: ByteArray,
         description: ByteArray,
@@ -174,6 +196,14 @@ pub trait IFairLaunchAnonymizer<TState> {
     fn get_round_metadata(self: @TState, round_id: u64) -> RoundMetadata;
     fn is_revealed(self: @TState, round_id: u64, bid_id: felt252) -> bool;
     fn is_claimed(self: @TState, round_id: u64, bid_id: felt252) -> bool;
+
+    /// Current flat STRK fee charged to whoever creates a round, and where it goes.
+    /// (0, zero address) until the admin sets one.
+    fn get_launch_fee(self: @TState) -> (u128, ContractAddress);
+
+    /// Admin-only. Changes the launch fee going forward — never affects rounds already
+    /// created, since the fee is charged and recorded at creation time, not read live.
+    fn set_launch_fee(ref self: TState, fee: u128, recipient: ContractAddress);
 }
 
 #[starknet::contract]
@@ -208,7 +238,15 @@ mod FairLaunchAnonymizer {
         pub const NOT_FINALIZED: felt252 = 'NOT_FINALIZED';
         pub const NOT_REVEALED: felt252 = 'NOT_REVEALED';
         pub const ALREADY_CLAIMED: felt252 = 'ALREADY_CLAIMED';
+        pub const FEE_FAILED: felt252 = 'FEE_FAILED';
+        pub const CLAIM_LOCKED: felt252 = 'CLAIM_LOCKED';
+        pub const CLAIM_DELAY_TOO_LONG: felt252 = 'CLAIM_DELAY_TOO_LONG';
+        pub const NOT_ADMIN: felt252 = 'NOT_ADMIN';
     }
+
+    // Anti-sniping claim delay cap: 30 days. A creator can't lock bidders' allocations
+    // out indefinitely by setting an absurd delay.
+    const MAX_CLAIM_DELAY: u64 = 2592000;
 
     #[storage]
     struct Storage {
@@ -233,6 +271,11 @@ mod FairLaunchAnonymizer {
         // `total_escrowed` (STRK-only, commit/claim path) rather than merged, so this new
         // path can't touch the already-live-verified commit/claim accounting.
         pending_launch_token_escrow: Map<ContractAddress, u128>,
+        // Flat STRK fee charged to whoever creates a round, and where it's sent. Both
+        // admin-settable, both start at (0, zero address) so a fresh deployment charges
+        // nothing until the admin explicitly turns the fee on.
+        launch_fee: u128,
+        fee_recipient: ContractAddress,
     }
 
     #[event]
@@ -257,6 +300,10 @@ mod FairLaunchAnonymizer {
         ticket_size: u128,
         commit_end: u64,
         reveal_end: u64,
+        claim_delay: u64,
+        // Recorded per-round since `launch_fee` is a live, admin-mutable value — this is
+        // what was actually charged for this specific launch, not what the fee is now.
+        fee_paid: u128,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -301,6 +348,7 @@ mod FairLaunchAnonymizer {
         self.admin.write(admin);
         self.strk_token.write(strk_token);
         self.pool_address.write(pool_address);
+        // launch_fee / fee_recipient default to (0, zero) — no charge until set_launch_fee.
     }
 
     #[abi(embed_v0)]
@@ -328,6 +376,7 @@ mod FairLaunchAnonymizer {
             ticket_size: u128,
             commit_end: u64,
             reveal_end: u64,
+            claim_delay_seconds: u64,
             name: ByteArray,
             symbol: ByteArray,
             description: ByteArray,
@@ -349,6 +398,25 @@ mod FairLaunchAnonymizer {
             assert(delta_u128 >= total_supply, errors::FUNDING_FAILED);
             self.pending_launch_token_escrow.entry(launch_token).write(prior + delta_u128);
 
+            // Same idea, in STRK, for the launch fee: since the creator's own wallet never
+            // touches this call, the pool must also withdraw `launch_fee` STRK from the
+            // creator's shielded balance into this contract before invoking us. The delta
+            // against `total_escrowed` isolates that inflow from every other round's
+            // ticket escrow — see the module doc on why balance deltas, not raw balance,
+            // are used throughout this contract.
+            let fee_paid = self.launch_fee.read();
+            if fee_paid != 0 {
+                let strk = IErc20Dispatcher { contract_address: self.strk_token.read() };
+                let strk_balance: u256 = strk.balance_of(get_contract_address());
+                let prior_escrowed: u128 = self.total_escrowed.read();
+                let fee_delta: u256 = strk_balance - prior_escrowed.into();
+                let fee_delta_u128: u128 = fee_delta.try_into().expect('DELTA_OVERFLOW');
+                assert(fee_delta_u128 >= fee_paid, errors::FEE_FAILED);
+                let recipient = self.fee_recipient.read();
+                let sent = strk.transfer(recipient, fee_paid.into());
+                assert(sent, errors::FEE_FAILED);
+            }
+
             self
                 ._create_round(
                     Zero::zero(),
@@ -359,6 +427,8 @@ mod FairLaunchAnonymizer {
                     ticket_size,
                     commit_end,
                     reveal_end,
+                    claim_delay_seconds,
+                    fee_paid,
                     name,
                     symbol,
                     description,
@@ -375,12 +445,25 @@ mod FairLaunchAnonymizer {
             ticket_size: u128,
             commit_end: u64,
             reveal_end: u64,
+            claim_delay_seconds: u64,
             name: ByteArray,
             symbol: ByteArray,
             description: ByteArray,
             image_url: ByteArray,
         ) -> u64 {
             let creator = get_caller_address();
+
+            // Charged directly from the creator's own public wallet — they must approve
+            // this contract for `launch_fee` STRK (on top of approving `launch_token`)
+            // before calling. No-op if the admin hasn't set a fee.
+            let fee_paid = self.launch_fee.read();
+            if fee_paid != 0 {
+                let strk = IErc20Dispatcher { contract_address: self.strk_token.read() };
+                let recipient = self.fee_recipient.read();
+                let sent = strk.transfer_from(creator, recipient, fee_paid.into());
+                assert(sent, errors::FEE_FAILED);
+            }
+
             // Pull the creator's own tokens atomically, in this same call, rather than
             // trusting a separate "please fund this before anyone claims" step — the
             // round can only ever exist already backed by real supply.
@@ -399,6 +482,8 @@ mod FairLaunchAnonymizer {
                     ticket_size,
                     commit_end,
                     reveal_end,
+                    claim_delay_seconds,
+                    fee_paid,
                     name,
                     symbol,
                     description,
@@ -452,6 +537,11 @@ mod FairLaunchAnonymizer {
             round.finalized = true;
             round.clearing_num = clearing_num;
             round.clearing_den = clearing_den;
+            // Anchor the claim-unlock window to when finalize() actually landed, not to
+            // reveal_end — finalize is permissionless but nobody is obligated to call it
+            // the instant reveal_end passes, so anchoring here keeps every bidder's window
+            // identical regardless of when that happened.
+            round.claim_unlock_time = starknet::get_block_timestamp() + round.claim_delay;
             self.rounds.entry(round_id).write(round);
             self
                 .emit(
@@ -476,6 +566,16 @@ mod FairLaunchAnonymizer {
 
         fn is_claimed(self: @ContractState, round_id: u64, bid_id: felt252) -> bool {
             self.claimed.entry((round_id, bid_id)).read()
+        }
+
+        fn get_launch_fee(self: @ContractState) -> (u128, ContractAddress) {
+            (self.launch_fee.read(), self.fee_recipient.read())
+        }
+
+        fn set_launch_fee(ref self: ContractState, fee: u128, recipient: ContractAddress) {
+            assert(get_caller_address() == self.admin.read(), errors::NOT_ADMIN);
+            self.launch_fee.write(fee);
+            self.fee_recipient.write(recipient);
         }
     }
 
@@ -502,6 +602,8 @@ mod FairLaunchAnonymizer {
             ticket_size: u128,
             commit_end: u64,
             reveal_end: u64,
+            claim_delay_seconds: u64,
+            fee_paid: u128,
             name: ByteArray,
             symbol: ByteArray,
             description: ByteArray,
@@ -512,6 +614,7 @@ mod FairLaunchAnonymizer {
             assert(total_supply != 0, errors::ZERO_SUPPLY);
             assert(ticket_size != 0, errors::ZERO_TICKET);
             assert(commit_end < reveal_end, errors::BAD_DEADLINES);
+            assert(claim_delay_seconds <= MAX_CLAIM_DELAY, errors::CLAIM_DELAY_TOO_LONG);
 
             let round_id = self.next_round_id.read();
             self.next_round_id.write(round_id + 1);
@@ -530,6 +633,8 @@ mod FairLaunchAnonymizer {
                         finalized: false,
                         clearing_num: 0,
                         clearing_den: 0,
+                        claim_delay: claim_delay_seconds,
+                        claim_unlock_time: 0,
                     },
                 );
             self
@@ -547,6 +652,8 @@ mod FairLaunchAnonymizer {
                         ticket_size,
                         commit_end,
                         reveal_end,
+                        claim_delay: claim_delay_seconds,
+                        fee_paid,
                     },
                 );
             round_id
@@ -605,6 +712,9 @@ mod FairLaunchAnonymizer {
         ) -> Span<OpenNoteDeposit> {
             let round = self._get_round(round_id);
             assert(round.finalized, errors::NOT_FINALIZED);
+            assert(
+                starknet::get_block_timestamp() >= round.claim_unlock_time, errors::CLAIM_LOCKED,
+            );
 
             let key = (round_id, bid_id);
             assert(self.revealed.entry(key).read(), errors::NOT_REVEALED);

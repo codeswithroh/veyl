@@ -129,3 +129,39 @@ the private path with three new tests: `test_privacy_invoke_create_round_hides_c
 — all 9 tests (6 prior + 3 new) pass. A live end-to-end private round creation through the
 real pool (wallet-signed, via the dashboard UI's new Public/Private toggle) has not yet been
 run — see cairo/README.md "Not yet done".
+
+**Superseded (2026-08-31, same day — no launch fee, no anti-sniping claim delay):** the
+instance above (`0x033364f081e7dea882063392be7078696a6d50d3d80f8945355c006e366e267e`) had no
+way to charge a creation fee and no way to slow down claim-sniping. Replaced to add both.
+
+**Current — FairLaunchAnonymizer, redeployed 2026-08-31, adds launch fee + anti-sniping
+claim delay:**
+
+contract class hash : 0x3b4710724ebac29bea13d6dd497841d56b659973691462c4068ef18a2302d2e
+
+contract address (sepolia) : 0x0028c12d3fb690a3ccce37cdfa1e27a7c703c118f1ecd9840893a0a691cda80a
+
+constructor args : same as above (admin/strk_token/pool_address) — unchanged signature;
+`launch_fee`/`fee_recipient` are separate storage, both start at `(0, zero address)`.
+
+**What changed:**
+- `Round` gained `claim_delay: u64` and `claim_unlock_time: u64`. `create_round` and
+  `privacy_invoke_create_round` both take a new `claim_delay_seconds` param (capped at 30
+  days, `CLAIM_DELAY_TOO_LONG` otherwise): every bidder in a round gets the exact same
+  post-finalize window before `claim` will pay out, so the fastest bot can't claim (and
+  dump) before everyone else's allocation is even visible. `finalize()` anchors the window
+  to its own timestamp (`claim_unlock_time = now + claim_delay`), not to `reveal_end`.
+- New admin-gated `set_launch_fee(fee, recipient)` / public `get_launch_fee()`. Flat STRK,
+  zero by default, charged once at round creation and forwarded immediately — the contract
+  never holds fee revenue. Public `create_round` pulls it via `transfer_from` on the
+  creator's own wallet (on top of approving the launch token); the private path has the
+  pool pre-fund it in STRK the same way it pre-funds `total_supply` of the launch token
+  (verified via the same balance-delta pattern as `pending_launch_token_escrow`).
+- No fee is set yet on this deployment — `set_launch_fee` needs to be called once you've
+  decided an amount and a treasury address.
+
+**Verified:** all 17 `snforge` tests pass (8 prior + 9 new: fee default/admin-gate, fee
+charged on both create paths, underfunded-fee rejection on the private path, excessive
+claim-delay rejection, claim blocked before/allowed after the delay). Declared and deployed
+to Sepolia; not yet exercised live through the dashboard UI (frontend wiring for the new
+params is the next step).

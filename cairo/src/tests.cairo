@@ -52,6 +52,21 @@ fn create_test_round(
     commit_end: u64,
     reveal_end: u64,
 ) -> u64 {
+    create_test_round_with_delay(
+        anonymizer, launch, price, total_supply, ticket_size, commit_end, reveal_end, 0,
+    )
+}
+
+fn create_test_round_with_delay(
+    anonymizer: IFairLaunchAnonymizerDispatcher,
+    launch: IMockErc20Dispatcher,
+    price: u128,
+    total_supply: u128,
+    ticket_size: u128,
+    commit_end: u64,
+    reveal_end: u64,
+    claim_delay_seconds: u64,
+) -> u64 {
     launch.mint(ADMIN(), total_supply.into());
     start_cheat_caller_address(launch.contract_address, ADMIN());
     launch.approve(anonymizer.contract_address, total_supply.into());
@@ -66,6 +81,7 @@ fn create_test_round(
             ticket_size: ticket_size,
             commit_end: commit_end,
             reveal_end: reveal_end,
+            claim_delay_seconds: claim_delay_seconds,
             name: "Demo Token",
             symbol: "DEMO",
             description: "A demo token for fair-launch tests",
@@ -334,6 +350,7 @@ fn test_create_round_is_permissionless_and_atomically_funded() {
             ticket_size: 1000,
             commit_end: 100,
             reveal_end: 200,
+            claim_delay_seconds: 0,
             name: "My Token",
             symbol: "MTK",
             description: "Created by a random, non-admin wallet",
@@ -379,6 +396,7 @@ fn test_privacy_invoke_create_round_hides_creator() {
             ticket_size: 1000,
             commit_end: 100,
             reveal_end: 200,
+            claim_delay_seconds: 0,
             name: "Private Token",
             symbol: "PRIV",
             description: "Created without ever revealing who",
@@ -422,6 +440,7 @@ fn test_privacy_invoke_create_round_rejects_non_pool_caller() {
             ticket_size: 1000,
             commit_end: 100,
             reveal_end: 200,
+            claim_delay_seconds: 0,
             name: "x",
             symbol: "x",
             description: "",
@@ -452,9 +471,248 @@ fn test_privacy_invoke_create_round_rejects_underfunded_call() {
             ticket_size: 1000,
             commit_end: 100,
             reveal_end: 200,
+            claim_delay_seconds: 0,
             name: "x",
             symbol: "x",
             description: "",
             image_url: "",
         );
+}
+
+#[test]
+fn test_launch_fee_defaults_to_zero_and_is_admin_settable() {
+    let strk = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    let (fee, recipient) = anonymizer.get_launch_fee();
+    assert(fee == 0, 'fee should start at zero');
+    assert(recipient.is_zero(), 'recipient should start zero');
+
+    let treasury: ContractAddress = 'treasury'.try_into().unwrap();
+    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
+    anonymizer.set_launch_fee(50, treasury);
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    let (fee_after, recipient_after) = anonymizer.get_launch_fee();
+    assert(fee_after == 50, 'fee should update');
+    assert(recipient_after == treasury, 'recipient should update');
+}
+
+#[test]
+#[should_panic(expected: 'NOT_ADMIN')]
+fn test_set_launch_fee_rejects_non_admin() {
+    let strk = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+    let attacker: ContractAddress = 'attacker'.try_into().unwrap();
+    start_cheat_caller_address(anonymizer.contract_address, attacker);
+    anonymizer.set_launch_fee(50, attacker);
+}
+
+#[test]
+fn test_create_round_charges_launch_fee_from_creator() {
+    // Public path: the creator's own wallet pays the fee via transfer_from, on top of
+    // approving the launch token — verifies the fee actually leaves the creator and lands
+    // on the configured recipient, and that the round itself still gets funded normally.
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    let treasury: ContractAddress = 'treasury'.try_into().unwrap();
+    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
+    anonymizer.set_launch_fee(200, treasury);
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    let creator: ContractAddress = 'fee_creator'.try_into().unwrap();
+    strk.mint(creator, 200);
+    launch.mint(creator, 500);
+    start_cheat_caller_address(strk.contract_address, creator);
+    strk.approve(anonymizer.contract_address, 200);
+    stop_cheat_caller_address(strk.contract_address);
+    start_cheat_caller_address(launch.contract_address, creator);
+    launch.approve(anonymizer.contract_address, 500);
+    stop_cheat_caller_address(launch.contract_address);
+
+    start_cheat_caller_address(anonymizer.contract_address, creator);
+    anonymizer
+        .create_round(
+            launch_token: launch.contract_address,
+            price: 2,
+            total_supply: 500,
+            ticket_size: 1000,
+            commit_end: 100,
+            reveal_end: 200,
+            claim_delay_seconds: 0,
+            name: "Fee Token",
+            symbol: "FEE",
+            description: "",
+            image_url: "",
+        );
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    assert(strk.balance_of(treasury) == 200, 'fee should reach treasury');
+    assert(strk.balance_of(creator) == 0, 'creator should be debited');
+    assert(launch.balance_of(anonymizer.contract_address) == 500, 'round still funded');
+}
+
+#[test]
+fn test_privacy_invoke_create_round_charges_launch_fee_via_pool() {
+    // Private path: no creator wallet to pull from, so the pool must pre-fund the fee in
+    // STRK (mirrors how it pre-funds total_supply of the launch token) — verified via the
+    // same balance-delta pattern used for pending_launch_token_escrow.
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    let treasury: ContractAddress = 'treasury'.try_into().unwrap();
+    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
+    anonymizer.set_launch_fee(75, treasury);
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    launch.mint(POOL(), 500);
+    start_cheat_caller_address(launch.contract_address, POOL());
+    launch.transfer(anonymizer.contract_address, 500);
+    stop_cheat_caller_address(launch.contract_address);
+
+    strk.mint(POOL(), 75);
+    start_cheat_caller_address(strk.contract_address, POOL());
+    strk.transfer(anonymizer.contract_address, 75);
+    stop_cheat_caller_address(strk.contract_address);
+
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer
+        .privacy_invoke_create_round(
+            launch_token: launch.contract_address,
+            price: 2,
+            total_supply: 500,
+            ticket_size: 1000,
+            commit_end: 100,
+            reveal_end: 200,
+            claim_delay_seconds: 0,
+            name: "Private Fee Token",
+            symbol: "PFEE",
+            description: "",
+            image_url: "",
+        );
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    assert(strk.balance_of(treasury) == 75, 'fee should reach treasury');
+    assert(strk.balance_of(anonymizer.contract_address) == 0, 'fee should not stay escrowed');
+}
+
+#[test]
+#[should_panic(expected: 'FEE_FAILED')]
+fn test_privacy_invoke_create_round_rejects_underfunded_fee() {
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    let treasury: ContractAddress = 'treasury'.try_into().unwrap();
+    start_cheat_caller_address(anonymizer.contract_address, ADMIN());
+    anonymizer.set_launch_fee(75, treasury);
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    launch.mint(POOL(), 500);
+    start_cheat_caller_address(launch.contract_address, POOL());
+    launch.transfer(anonymizer.contract_address, 500);
+    stop_cheat_caller_address(launch.contract_address);
+
+    // Pool forgets to fund the fee at all — must be rejected, not silently waived.
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer
+        .privacy_invoke_create_round(
+            launch_token: launch.contract_address,
+            price: 2,
+            total_supply: 500,
+            ticket_size: 1000,
+            commit_end: 100,
+            reveal_end: 200,
+            claim_delay_seconds: 0,
+            name: "x",
+            symbol: "x",
+            description: "",
+            image_url: "",
+        );
+}
+
+#[test]
+#[should_panic(expected: 'CLAIM_DELAY_TOO_LONG')]
+fn test_create_round_rejects_excessive_claim_delay() {
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+    // MAX_CLAIM_DELAY is 30 days (2592000s) — one second over must be rejected.
+    create_test_round_with_delay(
+        anonymizer, launch, price: 2, total_supply: 500, ticket_size: 1000, commit_end: 100, reveal_end: 200, claim_delay_seconds: 2592001,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'CLAIM_LOCKED')]
+fn test_claim_blocked_before_anti_snipe_delay_elapses() {
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    let round_id = create_test_round_with_delay(
+        anonymizer, launch, price: 10, total_supply: 1000, ticket_size: 10000, commit_end: 100, reveal_end: 200, claim_delay_seconds: 300,
+    );
+
+    let bid_id: felt252 = 'bid_snipe';
+    let salt: felt252 = 'salt_snipe';
+    let commitment = poseidon_hash_span(array![salt].span());
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 50);
+    escrow_ticket(strk, anonymizer.contract_address, 10000);
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer.privacy_invoke(round_id, bid_id, FairLaunchAction::Commit(commitment));
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 150);
+    anonymizer.reveal(round_id, bid_id, salt);
+
+    // finalize() lands at t=250, so claim unlocks at 250 + 300 = 550.
+    start_cheat_block_timestamp(anonymizer.contract_address, 250);
+    anonymizer.finalize(round_id);
+
+    // Still inside the delay window — must revert, not pay out early.
+    start_cheat_block_timestamp(anonymizer.contract_address, 400);
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer.privacy_invoke(round_id, bid_id, FairLaunchAction::Claim(('t', 's')));
+}
+
+#[test]
+fn test_claim_succeeds_once_anti_snipe_delay_elapses() {
+    let strk = deploy_mock_erc20();
+    let launch = deploy_mock_erc20();
+    let anonymizer = deploy_anonymizer(strk.contract_address);
+
+    let round_id = create_test_round_with_delay(
+        anonymizer, launch, price: 10, total_supply: 1000, ticket_size: 10000, commit_end: 100, reveal_end: 200, claim_delay_seconds: 300,
+    );
+
+    let bid_id: felt252 = 'bid_patient';
+    let salt: felt252 = 'salt_patient';
+    let commitment = poseidon_hash_span(array![salt].span());
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 50);
+    escrow_ticket(strk, anonymizer.contract_address, 10000);
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    anonymizer.privacy_invoke(round_id, bid_id, FairLaunchAction::Commit(commitment));
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 150);
+    anonymizer.reveal(round_id, bid_id, salt);
+
+    start_cheat_block_timestamp(anonymizer.contract_address, 250);
+    anonymizer.finalize(round_id);
+
+    // Exactly at the unlock time (250 + 300 = 550) — must succeed, not off-by-one revert.
+    start_cheat_block_timestamp(anonymizer.contract_address, 550);
+    start_cheat_caller_address(anonymizer.contract_address, POOL());
+    let deposits = anonymizer
+        .privacy_invoke(round_id, bid_id, FairLaunchAction::Claim(('open_note_token', 'open_note_strk')));
+    stop_cheat_caller_address(anonymizer.contract_address);
+
+    assert(deposits.len() == 1, 'expected exactly one deposit');
+    assert(anonymizer.is_claimed(round_id, bid_id), 'should be claimed');
 }
