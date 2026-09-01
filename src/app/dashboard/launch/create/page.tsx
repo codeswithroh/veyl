@@ -11,29 +11,56 @@ import { useStoreWallet } from "../../../components/Wallet/walletContext";
 import { useFrontendProvider } from "../../../components/client/provider/providerContext";
 import { fmtUnits } from "../../../components/client/WalletHandle/walletTerminalShared";
 import * as constants from "@/utils/constants";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
+// Uploads via XMLHttpRequest (not fetch) specifically for xhr.upload.onprogress - fetch
+// has no upload-progress event, and a coin image can be up to 15MB, long enough on a
+// slow connection that a real progress bar beats a bare "Uploading…" spinner.
 function ImageUpload({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
 
-  const onFile = async (file: File | undefined) => {
+  const onFile = (file: File | undefined) => {
     if (!file) return;
     setError("");
     setUploading(true);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/upload-image", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Upload failed.");
-      onChange(data.url);
-    } catch (e: any) {
-      setError(e?.message ?? "Upload failed.");
-    } finally {
+    setProgress(0);
+    const form = new FormData();
+    form.append("file", file);
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
-    }
+      let data: any = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* fall through to the generic error below */
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data?.url) {
+        onChange(data.url);
+      } else {
+        setError(data?.error ?? "Upload failed.");
+      }
+    };
+    xhr.onerror = () => {
+      setUploading(false);
+      setError("Upload failed.");
+    };
+    xhr.open("POST", "/api/upload-image");
+    xhr.send(form);
   };
 
   if (imageUrl) {
@@ -41,15 +68,22 @@ function ImageUpload({ imageUrl, onChange }: { imageUrl: string; onChange: (url:
       <div className={styles.uploadPreviewWrap}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt="" className={styles.imagePreview} onError={(e) => (e.currentTarget.style.display = "none")} />
-        <button type="button" className={styles.uploadRemoveBtn} onClick={() => onChange("")} aria-label="Remove image">
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon-xs"
+          className={styles.uploadRemoveBtn}
+          onClick={() => onChange("")}
+          aria-label="Remove image"
+        >
           ×
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-2">
       <label className={styles.uploadBox}>
         <input
           ref={inputRef}
@@ -60,17 +94,19 @@ function ImageUpload({ imageUrl, onChange }: { imageUrl: string; onChange: (url:
           disabled={uploading}
         />
         <span className={styles.uploadBoxIcon}>🖼</span>
-        <span className={styles.uploadBoxText}>{uploading ? "Uploading…" : "Select an image to upload"}</span>
+        <span className={styles.uploadBoxText}>{uploading ? `Uploading… ${progress}%` : "Select an image to upload"}</span>
         <span className={styles.uploadBoxHint}>PNG, JPG, GIF, or WEBP, max 15MB, 1:1 square recommended</span>
       </label>
+      {uploading && <Progress value={progress} />}
       {error && <span className={styles.uploadBoxError}>{error}</span>}
     </div>
   );
 }
 
 // The exact same markup the browse grid renders for a real round (styles.launchCard etc.)
-// — this is a preview, not a mockup, so it should never drift from what a finished
-// launch actually looks like.
+// - this is a preview, not a mockup, so it should never drift from what a finished
+// launch actually looks like. Deliberately NOT shadcn-ified: it has to stay pixel-for-
+// pixel identical to the real card in the browse grid, not just similarly styled.
 function LivePreviewCard({
   name,
   symbol,
@@ -88,7 +124,7 @@ function LivePreviewCard({
   const initials = (trimmedSymbol || trimmedName).slice(0, 2).toUpperCase();
   return (
     <div className={styles.previewCardWrap}>
-      <span className={styles.previewBadge}>Preview</span>
+      <Badge variant="secondary" className={styles.previewBadge}>Preview</Badge>
       <div className={styles.launchCard}>
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -196,197 +232,207 @@ export default function CreateLaunchPage() {
           </div>
         </div>
 
-        <div className={styles.formCard}>
-          <span className={styles.formSectionTitle}>Visibility</span>
-          <div className={styles.visibilityTabs}>
-            <button
-              type="button"
-              className={`${styles.visibilityTab} ${visibility === "public" ? styles.visibilityTabActive : ""}`}
-              onClick={() => setVisibility("public")}
-            >
-              🌐 Public
-            </button>
-            <button
-              type="button"
-              className={`${styles.visibilityTab} ${visibility === "private" ? styles.visibilityTabActive : ""}`}
-              onClick={() => setVisibility("private")}
-            >
-              🔒 Private
-            </button>
-          </div>
-          {visibility === "public" ? (
-            <span className={styles.formHint}>
-              You'll approve the contract to pull your total supply from your public wallet, then create the round in one more signature. Your wallet address is recorded as the creator, publicly visible.
-            </span>
-          ) : (
-            <span className={styles.formHint}>
-              No creator address is ever recorded. Requires the launch token to already be shielded in your privacy pool balance (Shield it first if you haven't). It's withdrawn straight into the round in one signature, with the privacy pool itself as the on-chain caller instead of your wallet.
-            </span>
-          )}
-        </div>
-
-        <div className={styles.formCard}>
-          <span className={styles.formSectionTitle}>Coin details</span>
-          <ImageUpload imageUrl={imageUrl} onChange={setImageUrl} />
-          <div className={styles.formGrid2}>
-            <div className={styles.formRow}>
-              <label className={styles.formLabel} htmlFor="name">Name</label>
-              <input id="name" className={styles.formInput} value={name} onChange={(e) => setName(e.target.value)} placeholder="My Token" required />
+        <Card>
+          <CardHeader>
+            <CardTitle>Visibility</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={visibility === "public" ? "default" : "outline"}
+                onClick={() => setVisibility("public")}
+              >
+                🌐 Public
+              </Button>
+              <Button
+                type="button"
+                variant={visibility === "private" ? "default" : "outline"}
+                onClick={() => setVisibility("private")}
+              >
+                🔒 Private
+              </Button>
             </div>
-            <div className={styles.formRow}>
-              <label className={styles.formLabel} htmlFor="symbol">Symbol</label>
-              <input id="symbol" className={styles.formInput} value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} placeholder="MTK" required />
-            </div>
-          </div>
-          <div className={styles.formRow}>
-            <label className={styles.formLabel} htmlFor="description">Description</label>
-            <textarea id="description" className={styles.formTextarea} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this launch for?" />
-          </div>
-          <div className={styles.formRow}>
-            <label className={styles.formLabel} htmlFor="imageUrl">Image URL</label>
-            <input
-              id="imageUrl"
-              className={styles.formInput}
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://… (auto-filled after upload, or paste your own hosted URL)"
-            />
-          </div>
-        </div>
+            {visibility === "public" ? (
+              <span className={styles.formHint}>
+                You'll approve the contract to pull your total supply from your public wallet, then create the round in one more signature. Your wallet address is recorded as the creator, publicly visible.
+              </span>
+            ) : (
+              <span className={styles.formHint}>
+                No creator address is ever recorded. Requires the launch token to already be shielded in your privacy pool balance (Shield it first if you haven't). It's withdrawn straight into the round in one signature, with the privacy pool itself as the on-chain caller instead of your wallet.
+              </span>
+            )}
+          </CardContent>
+        </Card>
 
-        <div className={styles.formCard}>
-          <span className={styles.formSectionTitle}>Token contract</span>
-          <div className={styles.formRow}>
-            <label className={styles.formLabel} htmlFor="launchToken">Launch token address</label>
-            <input id="launchToken" className={styles.formInput} value={launchToken} onChange={(e) => setLaunchToken(e.target.value)} placeholder="0x…" required />
+        <Card>
+          <CardHeader>
+            <CardTitle>Coin details</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <ImageUpload imageUrl={imageUrl} onChange={setImageUrl} />
+            <div className={styles.formGrid2}>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My Token" required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="symbol">Symbol</Label>
+                <Input id="symbol" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} placeholder="MTK" required />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="description">Description</Label>
+              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this launch for?" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="imageUrl">Image URL</Label>
+              <Input
+                id="imageUrl"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://… (auto-filled after upload, or paste your own hosted URL)"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Token contract</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1.5">
+            <Label htmlFor="launchToken">Launch token address</Label>
+            <Input id="launchToken" value={launchToken} onChange={(e) => setLaunchToken(e.target.value)} placeholder="0x…" required />
             <span className={styles.formHint}>
               An existing ERC20 you hold at least "Total supply" of. Defaults to STRK for a quick self-dealing demo round.
             </span>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className={styles.formCard}>
-          <span className={styles.formSectionTitle}>Sale terms</span>
-          <div className={styles.formGrid2}>
-            <div className={styles.formRow}>
-              <label className={styles.formLabel} htmlFor="price">Price</label>
-              <div className={styles.inputSuffixWrap}>
-                <input id="price" className={styles.formInput} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" required />
-                <span className={styles.inputSuffix}>STRK</span>
-              </div>
-            </div>
-            <div className={styles.formRow}>
-              <label className={styles.formLabel} htmlFor="totalSupply">Total supply</label>
-              <input id="totalSupply" className={styles.formInput} value={totalSupply} onChange={(e) => setTotalSupply(e.target.value)} inputMode="decimal" required />
-              {visibility === "public" && tokenBalance !== null && (
-                <span className={insufficientBalance ? styles.uploadBoxError : styles.formHint}>
-                  {insufficientBalance
-                    ? `You only hold ${fmtUnits(tokenBalance, 18)} of this token. Lower the total supply or launch a token you hold more of.`
-                    : `You hold ${fmtUnits(tokenBalance, 18)} of this token.`}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className={styles.formGrid2}>
-            <div className={styles.formRow}>
-              <label className={styles.formLabel} htmlFor="ticketSize">Ticket size</label>
-              <div className={styles.inputSuffixWrap}>
-                <input id="ticketSize" className={styles.formInput} value={ticketSize} onChange={(e) => setTicketSize(e.target.value)} inputMode="decimal" required />
-                <span className={styles.inputSuffix}>STRK</span>
-              </div>
-              <span className={styles.formHint}>Every bidder escrows exactly this much: identical commits hide participation, not amount.</span>
-            </div>
-            <div />
-          </div>
-          <div className={styles.formGrid2}>
-            <div className={styles.formRow}>
-              <label className={styles.formLabel} htmlFor="commitDays">Commit window</label>
-              <div className={styles.inputSuffixWrap}>
-                <input id="commitDays" className={styles.formInput} type="number" min={1} value={commitDays} onChange={(e) => setCommitDays(Number(e.target.value))} required />
-                <span className={styles.inputSuffix}>days</span>
-              </div>
-            </div>
-            <div className={styles.formRow}>
-              <label className={styles.formLabel} htmlFor="revealDays">Reveal window after</label>
-              <div className={styles.inputSuffixWrap}>
-                <input id="revealDays" className={styles.formInput} type="number" min={1} value={revealDays} onChange={(e) => setRevealDays(Number(e.target.value))} required />
-                <span className={styles.inputSuffix}>days</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.formCard}>
-          <span className={styles.formSectionTitle}>Protection</span>
-          <div className={styles.toggleRow}>
-            <div className={styles.toggleRowText}>
-              <span className={styles.toggleRowTitle}>Anti-sniping claim delay</span>
-              <span className={styles.toggleRowDesc}>
-                Sealed-bid commit/reveal already prevents front-running during the bid itself. This adds a
-                uniform delay after the round finalizes before anyone, including bots, can claim, so no
-                one can race to claim and dump before other winners even see it land.
-              </span>
-              {antiSnipe && (
-                <div className={styles.delayInputRow}>
-                  <input
-                    type="number"
-                    min={1}
-                    max={43200}
-                    className={`${styles.formInput} ${styles.delayInput}`}
-                    value={claimDelayMinutes}
-                    onChange={(e) => setClaimDelayMinutes(Number(e.target.value))}
-                  />
-                  <span className={styles.formHint}>minutes (max 30 days)</span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Sale terms</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className={styles.formGrid2}>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="price">Price</Label>
+                <div className={styles.inputSuffixWrap}>
+                  <Input id="price" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" required />
+                  <span className={styles.inputSuffix}>STRK</span>
                 </div>
-              )}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="totalSupply">Total supply</Label>
+                <Input id="totalSupply" value={totalSupply} onChange={(e) => setTotalSupply(e.target.value)} inputMode="decimal" required />
+                {visibility === "public" && tokenBalance !== null && (
+                  <span className={insufficientBalance ? styles.uploadBoxError : styles.formHint}>
+                    {insufficientBalance
+                      ? `You only hold ${fmtUnits(tokenBalance, 18)} of this token. Lower the total supply or launch a token you hold more of.`
+                      : `You hold ${fmtUnits(tokenBalance, 18)} of this token.`}
+                  </span>
+                )}
+              </div>
             </div>
-            <button
-              type="button"
-              className={`${styles.switch} ${antiSnipe ? styles.switchOn : ""}`}
-              role="switch"
-              aria-checked={antiSnipe}
-              aria-label="Toggle anti-sniping claim delay"
-              onClick={() => setAntiSnipe((v) => !v)}
-            >
-              <span className={styles.switchKnob} />
-            </button>
-          </div>
-        </div>
+            <div className={styles.formGrid2}>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="ticketSize">Ticket size</Label>
+                <div className={styles.inputSuffixWrap}>
+                  <Input id="ticketSize" value={ticketSize} onChange={(e) => setTicketSize(e.target.value)} inputMode="decimal" required />
+                  <span className={styles.inputSuffix}>STRK</span>
+                </div>
+                <span className={styles.formHint}>Every bidder escrows exactly this much: identical commits hide participation, not amount.</span>
+              </div>
+              <div />
+            </div>
+            <div className={styles.formGrid2}>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="commitDays">Commit window</Label>
+                <div className={styles.inputSuffixWrap}>
+                  <Input id="commitDays" type="number" min={1} value={commitDays} onChange={(e) => setCommitDays(Number(e.target.value))} required />
+                  <span className={styles.inputSuffix}>days</span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="revealDays">Reveal window after</Label>
+                <div className={styles.inputSuffixWrap}>
+                  <Input id="revealDays" type="number" min={1} value={revealDays} onChange={(e) => setRevealDays(Number(e.target.value))} required />
+                  <span className={styles.inputSuffix}>days</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Protection</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={styles.toggleRow}>
+              <div className={styles.toggleRowText}>
+                <Label htmlFor="antiSnipe" className={styles.toggleRowTitle}>Anti-sniping claim delay</Label>
+                <span className={styles.toggleRowDesc}>
+                  Sealed-bid commit/reveal already prevents front-running during the bid itself. This adds a
+                  uniform delay after the round finalizes before anyone, including bots, can claim, so no
+                  one can race to claim and dump before other winners even see it land.
+                </span>
+                {antiSnipe && (
+                  <div className={styles.delayInputRow}>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={43200}
+                      className={styles.delayInput}
+                      value={claimDelayMinutes}
+                      onChange={(e) => setClaimDelayMinutes(Number(e.target.value))}
+                    />
+                    <span className={styles.formHint}>minutes (max 30 days)</span>
+                  </div>
+                )}
+              </div>
+              <Switch id="antiSnipe" checked={antiSnipe} onCheckedChange={setAntiSnipe} />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className={styles.createSidebar}>
         <span className={styles.sidebarLabel}>Live preview</span>
         <LivePreviewCard name={name} symbol={symbol} description={description} imageUrl={imageUrl} />
 
-        <div className={styles.summaryCard}>
-          <div className={styles.summaryRow}>
-            <span className={styles.summaryRowLabel}>Visibility</span>
-            <span className={styles.summaryRowValue}>{visibility === "private" ? "🔒 Private" : "🌐 Public"}</span>
-          </div>
-          <div className={styles.summaryRow}>
-            <span className={styles.summaryRowLabel}>Network</span>
-            <span className={styles.summaryRowValue}>{networkLabel}</span>
-          </div>
-          <div className={styles.summaryDivider} />
-          <div className={styles.summaryRow}>
-            <span className={styles.summaryRowLabel}>Launch fee</span>
-            <span className={launchFeeUnits === 0n ? `${styles.summaryRowValue} ${styles.summaryRowValueGreen}` : styles.summaryRowValue}>
-              {launchFeeUnits === 0n ? "Free" : `${feeDisplay} STRK`}
-            </span>
-          </div>
-          <div className={styles.summaryRow}>
-            <span className={styles.summaryRowLabel}>Anti-sniping delay</span>
-            <span className={styles.summaryRowValue}>{antiSnipe ? `${claimDelayMinutes} min` : "Off"}</span>
-          </div>
+        <Card>
+          <CardContent className="flex flex-col gap-2.5">
+            <div className={styles.summaryRow}>
+              <span className={styles.summaryRowLabel}>Visibility</span>
+              <span className={styles.summaryRowValue}>{visibility === "private" ? "🔒 Private" : "🌐 Public"}</span>
+            </div>
+            <div className={styles.summaryRow}>
+              <span className={styles.summaryRowLabel}>Network</span>
+              <span className={styles.summaryRowValue}>{networkLabel}</span>
+            </div>
+            <div className={styles.summaryDivider} />
+            <div className={styles.summaryRow}>
+              <span className={styles.summaryRowLabel}>Launch fee</span>
+              <span className={launchFeeUnits === 0n ? `${styles.summaryRowValue} ${styles.summaryRowValueGreen}` : styles.summaryRowValue}>
+                {launchFeeUnits === 0n ? "Free" : `${feeDisplay} STRK`}
+              </span>
+            </div>
+            <div className={styles.summaryRow}>
+              <span className={styles.summaryRowLabel}>Anti-sniping delay</span>
+              <span className={styles.summaryRowValue}>{antiSnipe ? `${claimDelayMinutes} min` : "Off"}</span>
+            </div>
 
-          {isConnected ? (
-            <button className={uni.btnCta} disabled={busy || insufficientBalance} type="submit" style={{ marginTop: 6 }}>
-              {insufficientBalance ? "Insufficient balance" : submitLabel}
-            </button>
-          ) : (
-            <SelectWallet variant="ctaBig" />
-          )}
-        </div>
+            {isConnected ? (
+              <Button size="lg" className="w-full mt-1.5" disabled={busy || insufficientBalance} type="submit">
+                {insufficientBalance ? "Insufficient balance" : submitLabel}
+              </Button>
+            ) : (
+              <SelectWallet variant="ctaBig" />
+            )}
+          </CardContent>
+        </Card>
 
         {result && <ResultCard r={result} providerIndex={providerIndex} />}
 

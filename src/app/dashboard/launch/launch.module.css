@@ -106,7 +106,7 @@
 
 /* ---- Input with a unit suffix (STRK, days, min) baked in, not just hint text below ---- */
 .inputSuffixWrap { position: relative; display: flex; align-items: center; }
-.inputSuffixWrap .formInput { padding-right: 52px; width: 100%; }
+.inputSuffixWrap input[data-slot="input"] { padding-right: 52px; width: 100%; }
 .inputSuffix {
   position: absolute;
   right: 14px;
@@ -136,60 +136,13 @@
 }
 
 /* ---- Review summary: a receipt, not another equal-weight form card ---- */
-.summaryCard {
-  border-radius: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
 .summaryRow { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; gap: 10px; }
 .summaryRowLabel { color: var(--muted); }
 .summaryRowValue { font-weight: 700; text-align: right; }
 .summaryRowValueGreen { color: var(--green); }
 .summaryDivider { height: 1px; background: var(--border); margin: 2px 0; }
-.formCard {
-  border-radius: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.formSectionTitle { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 4px 0 -4px; }
-.formRow { display: flex; flex-direction: column; gap: 6px; }
 .formGrid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.formLabel { font-size: 12.5px; font-weight: 600; color: var(--text); }
-.formInput, .formTextarea {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  color: var(--text);
-  font-family: var(--font-body), sans-serif;
-  font-size: 14px;
-  outline: none;
-}
-.formInput:focus, .formTextarea:focus { border-color: var(--primary); }
-.formTextarea { resize: vertical; min-height: 72px; }
 .formHint { font-size: 11.5px; color: var(--muted); }
-
-.visibilityTabs { display: flex; gap: 6px; padding: 3px; background: var(--surface-2); border-radius: 10px; width: fit-content; }
-.visibilityTab {
-  padding: 8px 18px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  font-family: var(--font-body), sans-serif;
-}
-.visibilityTabActive { background: var(--surface); color: var(--text); }
 .imagePreview {
   width: 100%;
   height: 140px;
@@ -272,20 +225,6 @@
   justify-content: center;
 }
 
-/* ---- Fee summary ---- */
-.feeRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  font-size: 13px;
-}
-.feeRowLabel { color: var(--muted); }
-.feeRowValue { font-weight: 700; }
-.feeRowValueFree { color: var(--green); }
-
 /* ---- Anti-sniping toggle ---- */
 .toggleRow {
   display: flex;
@@ -300,30 +239,5 @@
 .toggleRowText { display: flex; flex-direction: column; gap: 2px; }
 .toggleRowTitle { font-size: 13px; font-weight: 700; }
 .toggleRowDesc { font-size: 11.5px; color: var(--muted); }
-.switch {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  flex: none;
-  border-radius: 999px;
-  background: var(--border);
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-.switchOn { background: var(--primary); }
-.switchKnob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .switchKnob { transition: transform 0.15s ease; }
-}
-.switchOn .switchKnob { transform: translateX(18px); }
 .delayInputRow { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .delayInput { width: 90px; }
