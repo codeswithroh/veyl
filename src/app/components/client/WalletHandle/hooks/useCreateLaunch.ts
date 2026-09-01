@@ -69,6 +69,42 @@ export function useLaunchFee() {
   return { fee, feeRecipient, feeDisplay: fmtStrk(fee) };
 }
 
+// Reads the connected wallet's balance of an arbitrary ERC20 (the launch token, by
+// address). The public create_round path pulls `total_supply` of this token straight
+// from the creator's own wallet via transfer_from - with no client-side check, a creator
+// who doesn't actually hold that much only finds out when their wallet's fee simulation
+// (or the transaction itself) reverts, with no explanation of why.
+export function useTokenBalance(tokenAddress: string) {
+  const myFrontendProviderIndex = useFrontendProvider((state) => state.currentFrontendProviderIndex);
+  const connectedAddress = useStoreWallet((state) => state.address);
+  const [balance, setBalance] = useState<bigint | null>(null);
+
+  useEffect(() => {
+    const provider = constants.myFrontendProviders[myFrontendProviderIndex];
+    let hasToken = false;
+    try {
+      hasToken = !!provider && !!connectedAddress && num.toBigInt(tokenAddress) !== 0n;
+    } catch {
+      hasToken = false;
+    }
+    if (!hasToken) {
+      setBalance(null);
+      return;
+    }
+    let cancelled = false;
+    const contract = new Contract({ abi: constants.Erc20ApproveAbi as unknown as any, address: tokenAddress, providerOrAccount: provider });
+    contract
+      .call("balance_of", [connectedAddress])
+      .then((r: any) => !cancelled && setBalance(BigInt(r)))
+      .catch(() => !cancelled && setBalance(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [myFrontendProviderIndex, connectedAddress, tokenAddress]);
+
+  return balance;
+}
+
 // Create a new permissionless fair-launch round: approve the anonymizer for total_supply
 // of the creator's own token, then call create_round (which atomically pulls that supply
 // in the same on-chain call). Two wallet-signed transactions, both plain calls (not

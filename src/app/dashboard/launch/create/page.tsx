@@ -6,9 +6,10 @@ import styles from "../launch.module.css";
 import uni from "../../../uni.module.css";
 import SelectWallet from "../../../components/client/WalletHandle/SelectWallet";
 import { ResultCard } from "../../../components/client/WalletHandle/walletTerminalShared";
-import { useCreateLaunch, useLaunchFee } from "../../../components/client/WalletHandle/hooks/useCreateLaunch";
+import { useCreateLaunch, useLaunchFee, useTokenBalance } from "../../../components/client/WalletHandle/hooks/useCreateLaunch";
 import { useStoreWallet } from "../../../components/Wallet/walletContext";
 import { useFrontendProvider } from "../../../components/client/provider/providerContext";
+import { fmtUnits } from "../../../components/client/WalletHandle/walletTerminalShared";
 import * as constants from "@/utils/constants";
 
 function ImageUpload({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) {
@@ -133,8 +134,27 @@ export default function CreateLaunchPage() {
 
   const busy = step === "approving" || step === "creating";
 
+  // create_round pulls `total_supply` of the launch token straight from the creator's own
+  // public wallet via transfer_from - if they don't actually hold that much, the wallet's
+  // own fee simulation (correctly) predicts a revert with no useful explanation. Catching
+  // it here, before a transaction is ever proposed, turns that into a clear inline message
+  // instead of a confusing wallet-level warning.
+  const tokenBalance = useTokenBalance(visibility === "public" ? launchToken : "0x0");
+  const totalSupplyUnits = (() => {
+    const n = Number(totalSupply);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    try {
+      return BigInt(Math.round(n * 1e18));
+    } catch {
+      return null;
+    }
+  })();
+  const insufficientBalance =
+    visibility === "public" && tokenBalance !== null && totalSupplyUnits !== null && totalSupplyUnits > tokenBalance;
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (insufficientBalance) return;
     const input = {
       launchToken,
       priceStrk: price,
@@ -258,6 +278,13 @@ export default function CreateLaunchPage() {
             <div className={styles.formRow}>
               <label className={styles.formLabel} htmlFor="totalSupply">Total supply</label>
               <input id="totalSupply" className={styles.formInput} value={totalSupply} onChange={(e) => setTotalSupply(e.target.value)} inputMode="decimal" required />
+              {visibility === "public" && tokenBalance !== null && (
+                <span className={insufficientBalance ? styles.uploadBoxError : styles.formHint}>
+                  {insufficientBalance
+                    ? `You only hold ${fmtUnits(tokenBalance, 18)} of this token. Lower the total supply or launch a token you hold more of.`
+                    : `You hold ${fmtUnits(tokenBalance, 18)} of this token.`}
+                </span>
+              )}
             </div>
           </div>
           <div className={styles.formGrid2}>
@@ -353,8 +380,8 @@ export default function CreateLaunchPage() {
           </div>
 
           {isConnected ? (
-            <button className={uni.btnCta} disabled={busy} type="submit" style={{ marginTop: 6 }}>
-              {submitLabel}
+            <button className={uni.btnCta} disabled={busy || insufficientBalance} type="submit" style={{ marginTop: 6 }}>
+              {insufficientBalance ? "Insufficient balance" : submitLabel}
             </button>
           ) : (
             <SelectWallet variant="ctaBig" />

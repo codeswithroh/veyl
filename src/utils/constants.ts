@@ -195,7 +195,9 @@ export const FairLaunchAnonymizerAbi = [
 ] as const;
 
 // Minimal ERC20 ABI fragment — just enough to approve the fair-launch anonymizer to pull
-// `total_supply` of a creator's own token when they call create_round.
+// `total_supply` of a creator's own token when they call create_round, and to read a
+// balance client-side before submitting (create_round's transfer_from otherwise reverts
+// with no warning if the creator doesn't actually hold that much of the launch token).
 export const Erc20ApproveAbi = [
     {
         type: "function",
@@ -206,5 +208,12 @@ export const Erc20ApproveAbi = [
         ],
         outputs: [{ type: "core::bool" }],
         state_mutability: "external",
+    },
+    {
+        type: "function",
+        name: "balance_of",
+        inputs: [{ name: "account", type: "core::starknet::contract_address::ContractAddress" }],
+        outputs: [{ type: "core::integer::u256" }],
+        state_mutability: "view",
     },
 ] as const;
